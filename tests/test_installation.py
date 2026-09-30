@@ -78,7 +78,7 @@ class InstallationTests(unittest.TestCase):
     def test_foreign_file_collision_has_no_partial_writes(self):
         self.install.service.parent.mkdir(parents=True)
         self.install.service.write_text('foreign')
-        with self.assertRaisesRegex(ValueError, 'ajeno'):
+        with self.assertRaisesRegex(ValueError, 'unrelated'):
             self.install.install()
         self.assertFalse((self.home / '.local/bin/omalogi').exists())
         self.assertEqual(self.install.service.read_text(), 'foreign')
@@ -131,7 +131,7 @@ class InstallationTests(unittest.TestCase):
     def test_pending_transaction_stops_migration(self):
         legacy = self.legacy()
         (legacy / 'state.json').write_text('{"pending":true}')
-        with self.assertRaisesRegex(ValueError, 'pendiente'):
+        with self.assertRaisesRegex(ValueError, 'pending'):
             self.install.install()
         self.assertTrue(legacy.exists())
         self.assertFalse(self.install.app.exists())
@@ -139,7 +139,7 @@ class InstallationTests(unittest.TestCase):
     def test_migration_refuses_two_configuration_directories(self):
         self.legacy()
         self.install.app.mkdir()
-        with self.assertRaisesRegex(ValueError, 'dos directorios'):
+        with self.assertRaisesRegex(ValueError, 'Two configuration directories'):
             self.install.install()
 
     def test_failed_migration_rolls_back_files_and_directory_move(self):
@@ -169,7 +169,7 @@ class InstallationTests(unittest.TestCase):
         foreign = self.home / 'precious.txt'
         foreign.write_text('keep')
         (self.install.app / 'install.json').write_text(json.dumps({'files': [str(foreign)]}))
-        with self.assertRaisesRegex(ValueError, 'desconocidas'):
+        with self.assertRaisesRegex(ValueError, 'unknown'):
             self.install.uninstall()
         self.assertEqual(foreign.read_text(), 'keep')
 

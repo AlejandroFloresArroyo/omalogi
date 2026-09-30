@@ -167,14 +167,14 @@ impl Engine {
         };
         if old.as_ref().is_some_and(|s| s.pending) {
             return Err(
-                "Hay una operación incompleta. Ejecuta Restaurar antes de volver a aplicar".into(),
+                "There is an incomplete operation. Run Restore before applying again".into(),
             );
         }
         if old
             .as_ref()
             .is_some_and(|s| s.applied && s.config.device_id != config.device_id)
         {
-            return Err("Restaura el mouse actual antes de seleccionar otro".into());
+            return Err("Restore the current mouse before selecting another".into());
         }
         if let Some(ref state) = old
             && state.applied
@@ -190,8 +190,7 @@ impl Engine {
         let active = self.daemon_active();
         if !active && backend::run("pgrep", &["-x", "solaar"], None).is_ok() {
             return Err(
-                "Solaar está abierto fuera del servicio del MVP. Ciérralo y vuelve a aplicar"
-                    .into(),
+                "Solaar is running outside the Omalogi service. Close it and apply again".into(),
             );
         }
         self.service("stop")?;
@@ -252,7 +251,7 @@ impl Engine {
                         backend::set_button(&device.id, &button, &value)?;
                     }
                 } else if custom {
-                    return Err(format!("El mouse no admite {event}"));
+                    return Err(format!("The mouse does not support {event}"));
                 }
             }
             for (thumb, names) in [
@@ -269,7 +268,7 @@ impl Engine {
                         backend::set(&device.id, key, value)?;
                     }
                 } else if config.wheel(thumb) {
-                    return Err("El mouse no admite acciones para esa rueda".into());
+                    return Err("The mouse does not support actions for that wheel".into());
                 }
             }
             self.persistence("sensitive", &device.id, &previous.keys, &[], &Value::Null)?;
@@ -280,10 +279,10 @@ impl Engine {
             storage::save(&self.paths.file("profile.json"), &config)?;
             self.service("start")?;
             if !self.daemon_active() {
-                return Err("El capturador de eventos no inició".into());
+                return Err("Event capture did not start".into());
             }
             Ok(
-                json!({"ok":true,"message":"Configuración aplicada y verificada en el mouse","config":config}),
+                json!({"ok":true,"message":"Settings applied and verified on the mouse","config":config}),
             )
         })();
         if let Err(error) = result {
@@ -296,7 +295,7 @@ impl Engine {
                     let _ = self.service("start");
                 }
                 return Err(format!(
-                    "{error}. La recuperación necesita atención: {rollback}. Ejecuta Restaurar"
+                    "{error}. Recovery needs attention: {rollback}. Run Restore"
                 ));
             }
             if let Some(old) = old {
@@ -312,7 +311,7 @@ impl Engine {
             if active {
                 self.service("start")?;
             }
-            return Err(format!("{error}. Se recuperó el estado anterior"));
+            return Err(format!("{error}. Previous settings were restored"));
         }
         result
     }
@@ -338,8 +337,7 @@ impl Engine {
         let active = self.daemon_active();
         if !active && backend::run("pgrep", &["-x", "solaar"], None).is_ok() {
             return Err(
-                "Solaar está abierto fuera del servicio del MVP. Ciérralo y vuelve a aplicar"
-                    .into(),
+                "Solaar is running outside the Omalogi service. Close it and apply again".into(),
             );
         }
         self.service("stop")?;
@@ -372,7 +370,7 @@ impl Engine {
                     uncertain = response["rolled_back"] != true;
                     return Err(response["error"]
                         .as_str()
-                        .unwrap_or("Falló el ajuste del mouse")
+                        .unwrap_or("The mouse setting failed")
                         .to_string());
                 }
                 physical_before = Some(response["before"].clone());
@@ -399,7 +397,7 @@ impl Engine {
             storage::save(&self.paths.file("state.json"), &state)?;
             self.service("start")?;
             if !self.daemon_active() {
-                return Err("El capturador de eventos no inició".into());
+                return Err("Event capture did not start".into());
             }
             Ok(json!({"ok":true,"message":"Cambio aplicado y verificado","config":config}))
         })();
@@ -410,7 +408,7 @@ impl Engine {
                     if let Some(before) = physical_before {
                         let response = scalar(&config.device_id, &before)?;
                         if response["ok"] != true {
-                            return Err("No se confirmó el rollback físico".to_string());
+                            return Err("Hardware rollback was not confirmed".to_string());
                         }
                     }
                     self.persistence("restore", &config.device_id, &keys, &[], &persisted)?;
@@ -425,15 +423,13 @@ impl Engine {
                     Ok::<(), String>(())
                 })();
                 if rollback.is_ok() {
-                    return Err(format!("{error}. Se recuperó el estado anterior"));
+                    return Err(format!("{error}. Previous settings were restored"));
                 }
             }
             state.pending = true;
             state.applied = false;
             let _ = storage::save(&self.paths.file("state.json"), &state);
-            return Err(format!(
-                "{error}. La recuperación necesita atención. Ejecuta Restaurar"
-            ));
+            return Err(format!("{error}. Recovery needs attention. Run Restore"));
         }
         result
     }
@@ -442,7 +438,7 @@ impl Engine {
         let _lock = self.paths.lock()?;
         let mut state: State = storage::read(&self.paths.file("state.json"))?;
         if !state.applied && !state.pending {
-            return Ok(json!({"ok":true,"message":"El estado original ya está restaurado"}));
+            return Ok(json!({"ok":true,"message":"Original settings are already restored"}));
         }
         self.service("stop")?;
         state.pending = true;
@@ -452,7 +448,7 @@ impl Engine {
         state.applied = false;
         storage::save(&self.paths.file("state.json"), &state)?;
         self.service("start")?;
-        Ok(json!({"ok":true,"message":"Estado original restaurado y verificado"}))
+        Ok(json!({"ok":true,"message":"Original settings restored y verificado"}))
     }
     pub fn status(&self) -> Result<Value, String> {
         let _lock = self.paths.lock()?;
@@ -488,7 +484,7 @@ impl Engine {
         };
         let mut state: State = storage::read(&self.paths.file("state.json"))?;
         if !state.applied || state.pending {
-            return Err("No hay un perfil activo".into());
+            return Err("No active profile".into());
         }
         let timestamp = storage::now();
         let mut events: Vec<Value> =
@@ -517,7 +513,7 @@ impl Engine {
             .and_then(|output| {
                 if ["unknown", "unhandled", "disabled"].contains(&output.trim()) {
                     Err(format!(
-                        "El escritorio no pudo ejecutar {action}: {}",
+                        "The desktop could not run {action}: {}",
                         output.trim()
                     ))
                 } else {
@@ -553,7 +549,7 @@ impl Engine {
                 .find(|n| **n < current)
                 .or(presets.last())
         }
-        .ok_or("No hay presets DPI compatibles")?;
+        .ok_or("No supported DPI presets")?;
         backend::set(&device.id, "dpi", &next.to_string())?;
         let live = backend::run("solaar", &["config", &device.id, "dpi"], None)?;
         let (readback, _) = backend::parse_settings(&live);
@@ -561,7 +557,7 @@ impl Engine {
             .get("dpi")
             .is_none_or(|d| d.value != next.to_string())
         {
-            return Err("Solaar no confirmó el cambio de DPI".into());
+            return Err("Solaar did not confirm the DPI change".into());
         }
         state.config.hardware.insert("dpi".into(), next.to_string());
         storage::save(&self.paths.file("state.json"), state)?;
@@ -702,7 +698,7 @@ fn verify_snapshot(snapshot: &Snapshot) -> Result<(), String> {
             &device.settings[key].value,
             &snapshot.device.settings[key].value,
         ) {
-            return Err(format!("No se confirmó la restauración de {key}"));
+            return Err(format!("Restoration of {key} was not confirmed"));
         }
     }
     for button in snapshot
@@ -717,7 +713,7 @@ fn verify_snapshot(snapshot: &Snapshot) -> Result<(), String> {
             "Diverted"
         };
         if device.buttons.get(button).map(String::as_str) != Some(expected) {
-            return Err(format!("No se confirmó la restauración de {button}"));
+            return Err(format!("Restoration of {button} was not confirmed"));
         }
     }
     Ok(())
@@ -734,7 +730,7 @@ fn verify_profile(config: &Config, baseline: &Snapshot) -> Result<(), String> {
                 .is_some_and(|s| s.value == "Freespinning")
         {
             if device.settings.get(key).is_none_or(|s| s.value != "1") {
-                return Err("No se confirmó SmartShift en giro libre".into());
+                return Err("SmartShift in free-spin mode was not confirmed".into());
             }
             continue;
         }
@@ -743,7 +739,7 @@ fn verify_profile(config: &Config, baseline: &Snapshot) -> Result<(), String> {
             .get(key)
             .is_none_or(|s| !backend::equal_value(&s.value, value))
         {
-            return Err(format!("No se confirmó {key}"));
+            return Err(format!("{key} was not confirmed"));
         }
     }
     for event in ["button.back", "button.forward", "gesture"] {
@@ -759,7 +755,7 @@ fn verify_profile(config: &Config, baseline: &Snapshot) -> Result<(), String> {
                 "Regular"
             };
             if device.buttons.get(&button).map(String::as_str) != Some(expected) {
-                return Err(format!("No se confirmó {button}"));
+                return Err(format!("{button} was not confirmed"));
             }
         }
     }
@@ -775,7 +771,7 @@ fn verify_profile(config: &Config, baseline: &Snapshot) -> Result<(), String> {
                 &baseline.device.settings[key].value
             };
             if !backend::equal_value(&setting.value, expected) {
-                return Err(format!("No se confirmó {key}"));
+                return Err(format!("{key} was not confirmed"));
             }
         }
     }

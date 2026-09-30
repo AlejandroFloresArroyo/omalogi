@@ -20,33 +20,33 @@ def text(value):
 
 try:
     if not request["values"] or not set(request["values"]) <= allowed:
-        raise ValueError("Cambio escalar no compatible")
+        raise ValueError("Unsupported scalar change")
     receivers = list(_receivers_and_devices())
     dev = next((d for d in _find_device(receivers, request["id"].lower()) if d.ping()), None)
     if dev is None or request["id"].lower() not in (str(dev.serial).lower(), str(dev.unitId).lower()):
-        raise ValueError("El mouse seleccionado no está conectado")
+        raise ValueError("The selected mouse is not connected")
     for key, value in request["values"].items():
         setting = settings_templates.check_feature_setting(dev, key)
         if setting is None:
-            raise ValueError(f"El mouse no admite {key}")
+            raise ValueError(f"The mouse does not support {key}")
         if setting.kind == settings.Kind.TOGGLE and value in ("true", "false"):
             desired = value == "true"
         elif setting.kind == settings.Kind.CHOICE and int(value) in setting.choices:
             desired = int(value)
         else:
-            raise ValueError(f"Valor no compatible para {key}")
+            raise ValueError(f"Unsupported value for {key}")
         original = setting.read(cached=False)
         if original is None:
-            raise ValueError(f"No se pudo leer {key}")
+            raise ValueError(f"Could not read {key}")
         prepared[key] = (setting, desired)
         before[key] = original
     for key, (setting, value) in prepared.items():
         if before[key] != value:
             wrote = True  # A failed write can have already changed the physical device.
             if setting.write(value, save=False) is None:
-                raise ValueError(f"No se pudo escribir {key}")
+                raise ValueError(f"Could not write {key}")
         if setting.read(cached=False) != value:
-            raise ValueError(f"El mouse no confirmó {key}")
+            raise ValueError(f"The mouse did not confirm {key}")
     print(json.dumps({"ok": True, "before": {k: text(v) for k, v in before.items()}}))
 except Exception as error:
     recovered = True

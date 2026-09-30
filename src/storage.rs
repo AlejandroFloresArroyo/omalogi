@@ -18,9 +18,9 @@ impl Paths {
         let root = env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| env::var_os("HOME").map(|v| PathBuf::from(v).join(".config")))
-            .ok_or("No se encuentra HOME ni XDG_CONFIG_HOME")?;
+            .ok_or("Neither HOME nor XDG_CONFIG_HOME is set")?;
         if root.join("omarchy-logi/install.json").exists() {
-            return Err("La instalación local anterior necesita migración. Ejecuta el instalador de Omalogi antes de usar la nueva CLI".into());
+            return Err("The previous local installation needs migration. Run the Omalogi installer before using the new CLI".into());
         }
         Ok(Self {
             app: root.join("omalogi"),

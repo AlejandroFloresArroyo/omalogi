@@ -4,38 +4,38 @@ use serde_json::{Value, json};
 use std::io::{self, Read};
 
 #[derive(Parser)]
-#[command(version, about = "Controles Logitech integrados con Omarchy")]
+#[command(version, about = "Logitech mouse controls for Omarchy")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
 #[derive(Subcommand)]
 enum Commands {
-    /// Estado real del mouse y perfil editable, en JSON
+    /// Live mouse status and editable profile, as JSON
     Status,
-    /// Perfil actual; --stdin guarda JSON sin aplicarlo
+    /// Current profile; --stdin saves JSON without applying it
     Config {
         #[arg(long)]
         stdin: bool,
     },
-    /// Aplicar y verificar el perfil guardado; --stdin recibe JSON
+    /// Apply and verify the saved profile; --stdin accepts JSON
     Apply {
         #[arg(long)]
         stdin: bool,
     },
-    /// Recuperar ajustes y reglas previas
+    /// Restore previous settings and rules
     Restore,
-    /// Eventos observados por Solaar (manuales se etiquetan aparte)
+    /// Events observed by Solaar (manual events are labeled separately)
     Events,
-    /// Invocado por las reglas de Solaar
+    /// Invoked by Solaar rules
     Trigger {
         event: String,
         #[arg(long)]
         manual: bool,
     },
-    /// Abrir el panel del escritorio
+    /// Open the desktop panel
     Panel,
-    /// Comprobar dependencias sin modificar ajustes
+    /// Check dependencies without changing settings
     Doctor,
 }
 fn input() -> Result<Config, String> {
@@ -44,7 +44,7 @@ fn input() -> Result<Config, String> {
         .take(128 * 1024)
         .read_to_string(&mut text)
         .map_err(|e| e.to_string())?;
-    serde_json::from_str(&text).map_err(|e| format!("JSON de configuración inválido: {e}"))
+    serde_json::from_str(&text).map_err(|e| format!("Invalid configuration JSON: {e}"))
 }
 fn execute(cli: Cli) -> Result<Value, String> {
     let engine = Engine::new()?;

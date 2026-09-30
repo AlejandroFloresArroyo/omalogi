@@ -182,11 +182,11 @@ finish() {
 # ──────────────────────────────────────────────────────────────────────────
 # STAGES: dependency installation in the user's terminal.
 TOTAL_STAGES=1
-stage "Instalar Solaar"
-say "Solaar controla los ajustes y captura los gestos del mouse."
-say "Escribe la contraseña de sudo en esta terminal cuando se solicite."
-say "La contraseña no se guarda ni se envía al proyecto."
+stage "Install Solaar"
+say "Solaar controls mouse settings and captures gestures."
+say "Enter your sudo password in this terminal when prompted."
+say "Your password is not saved or sent to the project."
 omarchy pkg add solaar
 solaar --version
 finish
-pause "Solaar está instalado. Pulsa Enter para cerrar."
+pause "Solaar is installed. Press Enter to close."

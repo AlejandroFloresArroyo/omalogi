@@ -112,11 +112,11 @@ Item {
         }
         Repeater {
             model: [
-                {control:"wheel",label:"Rueda vertical",x:170,y:53,w:38,h:70},
-                {control:"forward",label:"Botón adelante",x:92,y:221,w:14,h:20},
-                {control:"back",label:"Botón atrás",x:90,y:241,w:16,h:26},
-                {control:"thumb",label:"Rueda horizontal",x:80,y:169,w:25,h:51},
-                {control:"gesture",label:"Botón de gestos",x:35,y:222,w:19,h:40}
+                {control:"wheel",label:"Vertical wheel",x:170,y:53,w:38,h:70},
+                {control:"forward",label:"Forward button",x:92,y:221,w:14,h:20},
+                {control:"back",label:"Back button",x:90,y:241,w:16,h:26},
+                {control:"thumb",label:"Horizontal wheel",x:80,y:169,w:25,h:51},
+                {control:"gesture",label:"Gesture button",x:35,y:222,w:19,h:40}
             ]
             Item {
                 required property var modelData

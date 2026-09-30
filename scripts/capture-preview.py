@@ -1,4 +1,5 @@
 """Capture the real native popup using simulated device data, without HID access."""
+import argparse
 import json
 from pathlib import Path
 import subprocess
@@ -6,6 +7,11 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--dpi', default='1000')
+parser.add_argument('--page', choices=['Mouse', 'Extras'], default='Mouse')
+parser.add_argument('--output', type=Path, default=ROOT/'docs/preview.png')
+args = parser.parse_args()
 FAKE = '''#!/usr/bin/python3
 import json,sys
 from pathlib import Path
@@ -79,7 +85,7 @@ ShellRoot {
 '''
 profile = {
     'version': 1, 'device_id': 'PREVIEW', 'device_name': 'MX Master 3S',
-    'hardware': {'dpi':'1000', 'scroll-ratchet':'Ratcheted', 'smart-shift':'10',
+    'hardware': {'dpi':args.dpi, 'scroll-ratchet':'Ratcheted', 'smart-shift':'10',
                  'hires-smooth-invert':'false', 'hires-smooth-resolution':'false', 'thumb-scroll-invert':'false'},
     'bindings': {e:'native' for e in ['gesture.click','gesture.up','gesture.down','gesture.left','gesture.right',
                  'button.back','button.forward','wheel.up','wheel.down','thumb.left','thumb.right']},
@@ -90,8 +96,8 @@ profile['bindings'].update({'gesture.click':'apps','gesture.up':'menu','gesture.
 settings = {key:{'value':value,'choices':[str(n) for n in range(200,8001,50)] if key=='dpi' else ['Ratcheted','Freespinning'],
                  'toggle':value in ('true','false')} for key,value in profile['hardware'].items()}
 actions = [{'id':key,'label':value} for key,value in [
-    ('native','Comportamiento habitual'), ('none','Sin acción'), ('apps','Aplicaciones'), ('menu','Menú de Omarchy'),
-    ('scratchpad','Scratchpad'), ('workspace.previous','Espacio anterior'), ('workspace.next','Espacio siguiente')]]
+    ('native','Default behavior'), ('none','No action'), ('apps','Applications'), ('menu','Omarchy menu'),
+    ('scratchpad','Scratchpad'), ('workspace.previous','Previous workspace'), ('workspace.next','Next workspace')]]
 status = {'ok':True,'devices':[{'id':'PREVIEW','name':'MX Master 3S','settings':settings}], 'config':profile,
           'actions':actions,'events':[],'applied':True,'pending':False,'daemon':True}
 with tempfile.TemporaryDirectory(prefix='omalogi-preview-') as temp:
@@ -105,7 +111,7 @@ with tempfile.TemporaryDirectory(prefix='omalogi-preview-') as temp:
     (base/'fake-cli').write_text(FAKE)
     (base/'fake-cli').chmod(0o755)
     (base/'status.json').write_text(json.dumps(status))
-    (base/'shell.qml').write_text(QML)
+    (base/'shell.qml').write_text(QML.replace('var p = widget.children[1]', 'var p = widget.children[1]; p.page = ' + json.dumps(args.page)))
     with (base/'quickshell.log').open('w') as log:
         process = subprocess.Popen(['qs','-p',str(base/'shell.qml'),'--no-color'], stdout=log,stderr=log)
         try:
@@ -116,7 +122,8 @@ with tempfile.TemporaryDirectory(prefix='omalogi-preview-') as temp:
                 time.sleep(.1)
             g = json.loads((base/'geometry.json').read_text())
             region = f"{g['x']},{g['y']} {g['width']}x{g['height']}"
-            output = ROOT/'docs/preview.png'
+            output = args.output
+            output.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(['grim','-g',region,str(output)], check=True)
             print(output)
         finally:

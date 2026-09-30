@@ -8,3 +8,5 @@
 /.aws/
 __pycache__/
 *.py[cod]
+
+/brag-output*/

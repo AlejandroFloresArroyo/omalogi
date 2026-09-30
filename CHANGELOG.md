@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-beta.2
+
+- Use English throughout the desktop panel, action menus, accessibility labels, CLI and installation messages.
+- Update the native preview and language specification.
+
+
 ## 0.1.0-beta.1
 
 - Omalogi branding, `omalogi` CLI and `omalogi.mouse` Omarchy bar widget.

@@ -15,4 +15,4 @@ if [[ $plugin_mode == git ]]; then
 else
   omarchy-shell shell rescanPlugins
 fi
-echo 'Omalogi desinstalado. Solaar, perfiles, respaldos y registros se conservaron.'
+echo 'Omalogi uninstalled. Solaar, profiles, backups and logs were kept.'

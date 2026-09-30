@@ -1,6 +1,6 @@
 [package]
 name = "omalogi"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 edition = "2024"
 description = "Logitech MX controls integrated with the Omarchy desktop"
 license = "MIT"

@@ -108,7 +108,7 @@ class TransactionTests(unittest.TestCase):
         _,status=self.cli("status"); c=status["config"]; c["hardware"]["dpi"]="1600"
         rc,result=self.cli("apply","--stdin",input=c,fail=True)
         self.assertEqual((rc,result["ok"]),(1,False))
-        self.assertIn("recuperó",result["error"])
+        self.assertIn("Previous settings were restored",result["error"])
         self.assertEqual(yaml.safe_load(self.config.read_text()),self.original)
         self.assertEqual((self.config.parent/"rules.yaml").read_text(),self.foreign)
         self.assertFalse((self.root/"omalogi/state.json").exists())
@@ -210,7 +210,7 @@ class TransactionTests(unittest.TestCase):
         rc,result=self.cli("apply","--stdin",input=c)
         self.env.pop("CRASH_FAST_BRIDGE")
         self.assertEqual((rc,result["ok"]),(1,False))
-        self.assertIn("Ejecuta Restaurar",result["error"])
+        self.assertIn("Run Restore",result["error"])
         state=json.loads((self.root/"omalogi/state.json").read_text())
         self.assertTrue(state["pending"]); self.assertFalse(state["applied"])
         self.assertEqual(self.cli("apply","--stdin",input=c)[0],1)

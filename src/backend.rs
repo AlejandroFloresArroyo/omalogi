@@ -19,7 +19,7 @@ pub fn run(program: &str, args: &[&str], input: Option<&str>) -> Result<String, 
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("No se pudo ejecutar {program}: {e}"))?;
+        .map_err(|e| format!("Could not run {program}: {e}"))?;
     let mut out = child.stdout.take().unwrap();
     let mut err = child.stderr.take().unwrap();
     let stdout = thread::spawn(move || {
@@ -48,7 +48,7 @@ pub fn run(program: &str, args: &[&str], input: Option<&str>) -> Result<String, 
         if start.elapsed() > Duration::from_secs(25) {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(format!("{program} no respondió en 25 segundos"));
+            return Err(format!("{program} did not respond within 25 seconds"));
         }
         thread::sleep(Duration::from_millis(20));
     };
@@ -159,7 +159,7 @@ pub fn device(id: &str, name: &str) -> Result<Device, String> {
     let text = result?;
     let (settings, buttons) = parse_settings(&text);
     if !settings.contains_key("dpi") {
-        return Err("El mouse no responde; enciéndelo y mueve el puntero".into());
+        return Err("The mouse is not responding; turn it on and move the pointer".into());
     }
     let actual_name = text
         .lines()
@@ -189,7 +189,7 @@ pub fn discover() -> Result<Vec<Device>, String> {
         if let Some(error) = failures.into_iter().next() {
             return Err(error);
         }
-        return Err("No hay un MX Master conectado. Revisa Bolt y enciende el mouse".into());
+        return Err("No MX Master is connected. Check Bolt and turn on the mouse".into());
     }
     Ok(result)
 }
@@ -220,7 +220,7 @@ pub fn write_settings(device: &Device, values: &BTreeMap<String, String>) -> Res
             .get("smart-shift")
             .is_none_or(|s| s.value != *threshold)
         {
-            return Err("No se confirmó el umbral SmartShift".into());
+            return Err("SmartShift threshold was not confirmed".into());
         }
     }
     if let Some(mode) = values.get("scroll-ratchet").or_else(|| {
@@ -252,7 +252,7 @@ pub fn validate_hardware(device: &Device, values: &BTreeMap<String, String>) -> 
         let setting = device
             .settings
             .get(key)
-            .ok_or_else(|| format!("El mouse no admite {key}"))?;
+            .ok_or_else(|| format!("The mouse does not support {key}"))?;
         let valid = if setting.toggle {
             ["true", "false"].contains(&value.to_lowercase().as_str())
         } else if key == "smart-shift" {
@@ -261,7 +261,7 @@ pub fn validate_hardware(device: &Device, values: &BTreeMap<String, String>) -> 
             setting.choices.contains(value)
         };
         if !valid {
-            return Err(format!("Valor no admitido para {key}: {value}"));
+            return Err(format!("Unsupported value for {key}: {value}"));
         }
     }
     Ok(())

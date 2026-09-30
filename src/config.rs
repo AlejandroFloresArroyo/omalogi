@@ -82,23 +82,23 @@ impl Config {
 
     pub fn validate(&self) -> Result<(), String> {
         if self.version != 1 {
-            return Err("Versión de configuración no soportada".into());
+            return Err("Unsupported configuration version".into());
         }
         if self.device_id.is_empty()
             || self.device_id.len() > 128
             || self.device_id.chars().any(char::is_control)
         {
-            return Err("Selecciona un mouse conectado antes de aplicar".into());
+            return Err("Select a connected mouse before applying changes".into());
         }
         if !(40..=1000).contains(&self.wheel_interval_ms) {
-            return Err("El intervalo de acciones de rueda debe estar entre 40 y 1000 ms".into());
+            return Err("Wheel action interval must be between 40 and 1000 ms".into());
         }
         for (event, action) in &self.bindings {
             if !EVENTS.contains(&event.as_str()) {
-                return Err(format!("Evento desconocido: {event}"));
+                return Err(format!("Unknown event: {event}"));
             }
             if !actions().iter().any(|entry| entry.id == *action) {
-                return Err(format!("Acción desconocida: {action}"));
+                return Err(format!("Unknown action: {action}"));
             }
         }
         let native_gestures = EVENTS[..5]
@@ -106,7 +106,10 @@ impl Config {
             .filter(|event| self.action(event) == "native")
             .count();
         if native_gestures != 0 && native_gestures != 5 {
-            return Err("Asigna los cinco gestos (puedes elegir Sin acción), o conserva todos como habituales".into());
+            return Err(
+                "Assign all five gestures (No action is allowed), or leave all at their defaults"
+                    .into(),
+            );
         }
         // Diverting a wheel changes both directions. Require explicit choices for
         // both rather than losing native scrolling in the unassigned direction.
@@ -116,12 +119,14 @@ impl Config {
                 .filter(|event| self.action(event) == "native")
                 .count();
             if native == 1 {
-                return Err("Asigna ambas direcciones de la rueda, o conserva ambas como desplazamiento normal".into());
+                return Err(
+                    "Assign both wheel directions, or leave both as normal scrolling".into(),
+                );
             }
         }
         for key in self.hardware.keys() {
             if !HARDWARE.contains(&key.as_str()) {
-                return Err(format!("Ajuste no permitido: {key}"));
+                return Err(format!("Setting not allowed: {key}"));
             }
         }
         Ok(())
@@ -136,26 +141,26 @@ pub struct Action {
 
 pub fn actions() -> Vec<Action> {
     [
-        ("native", "Comportamiento habitual"),
-        ("none", "Sin acción"),
-        ("apps", "Aplicaciones"),
-        ("menu", "Menú de Omarchy"),
-        ("workspace.next", "Espacio siguiente"),
-        ("workspace.previous", "Espacio anterior"),
-        ("workspace.former", "Último espacio"),
+        ("native", "Default behavior"),
+        ("none", "No action"),
+        ("apps", "Applications"),
+        ("menu", "Omarchy menu"),
+        ("workspace.next", "Next workspace"),
+        ("workspace.previous", "Previous workspace"),
+        ("workspace.former", "Last workspace"),
         ("scratchpad", "Scratchpad"),
-        ("audio", "Panel de audio"),
-        ("clipboard", "Portapapeles"),
-        ("screenshot", "Captura de pantalla"),
-        ("volume.up", "Subir volumen"),
-        ("volume.down", "Bajar volumen"),
-        ("volume.mute", "Silenciar / activar sonido"),
-        ("media.next", "Pista siguiente"),
-        ("media.previous", "Pista anterior"),
-        ("media.play", "Reproducir / pausar"),
-        ("dpi.next", "Siguiente DPI"),
-        ("dpi.previous", "DPI anterior"),
-        ("diagnostic", "Registrar evento de prueba"),
+        ("audio", "Audio panel"),
+        ("clipboard", "Clipboard"),
+        ("screenshot", "Screenshot"),
+        ("volume.up", "Volume up"),
+        ("volume.down", "Volume down"),
+        ("volume.mute", "Mute / unmute"),
+        ("media.next", "Next track"),
+        ("media.previous", "Previous track"),
+        ("media.play", "Play / pause"),
+        ("dpi.next", "Next DPI"),
+        ("dpi.previous", "Previous DPI"),
+        ("diagnostic", "Log test event"),
     ]
     .into_iter()
     .map(|(id, label)| Action {

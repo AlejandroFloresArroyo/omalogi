@@ -8,26 +8,26 @@ while (( $# )); do
   case "$1" in
     --from-source) from_source=1; shift ;;
     --offline) offline=1; shift ;;
-    --binary) [[ $# -ge 2 ]] || { echo 'Falta la ruta de --binary' >&2; exit 1; }; binary=$2; shift 2 ;;
+    --binary) [[ $# -ge 2 ]] || { echo 'Missing path for --binary' >&2; exit 1; }; binary=$2; shift 2 ;;
     -h|--help)
-      echo 'Uso: bash scripts/install.sh [--from-source] [--offline] [--binary /ruta/omalogi]'
-      echo 'Por defecto descarga el binario de la release correspondiente al manifiesto.'
+      echo 'Usage: bash scripts/install.sh [--from-source] [--offline] [--binary /path/to/omalogi]'
+      echo 'By default, downloads the release binary matching the manifest.'
       exit 0 ;;
-    *) echo "Opción desconocida: $1" >&2; exit 1 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
-(( !from_source )) || [[ -z $binary ]] || { echo 'Elige --from-source o --binary' >&2; exit 1; }
-(( EUID != 0 )) || { echo 'Ejecuta el instalador como tu usuario de escritorio, sin sudo.' >&2; exit 1; }
+(( !from_source )) || [[ -z $binary ]] || { echo 'Choose --from-source or --binary' >&2; exit 1; }
+(( EUID != 0 )) || { echo 'Run the installer as your desktop user, without sudo.' >&2; exit 1; }
 for command in omarchy omarchy-shell python3 systemctl; do
-  command -v "$command" >/dev/null || { echo "Falta la dependencia: $command" >&2; exit 1; }
+  command -v "$command" >/dev/null || { echo "Missing dependency: $command" >&2; exit 1; }
 done
 # The official plugin installer/host currently discover plugins under this exact location.
 [[ ${XDG_CONFIG_HOME:-"$HOME/.config"} == "$HOME/.config" ]] || {
-  echo 'Esta versión de Omarchy descubre plugins en ~/.config; XDG_CONFIG_HOME personalizado no está soportado por el instalador.' >&2; exit 1;
+  echo 'This Omarchy version discovers plugins in ~/.config; the installer does not support a custom XDG_CONFIG_HOME.' >&2; exit 1;
 }
 omarchy plugin validate "$project_dir"
 if ! command -v solaar >/dev/null; then
-  (( !offline )) || { echo 'Instala Solaar antes de usar --offline: omarchy pkg add solaar' >&2; exit 1; }
+  (( !offline )) || { echo 'Install Solaar before using --offline: omarchy pkg add solaar' >&2; exit 1; }
   omarchy pkg add solaar
 fi
 # The scalar adapter depends on internal APIs; accept only the version tested for this beta.
@@ -35,10 +35,10 @@ python3 - <<'PY'
 import solaar, yaml
 from solaar.cli import _find_device, _receivers_and_devices
 if solaar.__version__ != '1.1.20':
-    raise SystemExit(f'Solaar {solaar.__version__} no está validado para esta beta; versión probada: 1.1.20')
+    raise SystemExit(f'Solaar {solaar.__version__} is not validated for this beta; tested version: 1.1.20')
 PY
 version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$project_dir/manifest.json")
-[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo 'Versión de release inválida' >&2; exit 1; }
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo 'Invalid release version' >&2; exit 1; }
 temporary_dir=""
 legacy_stopped=0
 legacy_enabled=0
@@ -53,7 +53,7 @@ cleanup() {
         systemctl --user start omarchy-logi-solaar.service || true
       fi
     else
-      echo 'La migración de archivos terminó; vuelve a ejecutar el instalador para completar el arranque de Omalogi.' >&2
+      echo 'File migration finished; rerun the installer to complete Omalogi startup.' >&2
     fi
   fi
   if (( result != 0 && current_stopped )); then
@@ -63,29 +63,29 @@ cleanup() {
 }
 trap cleanup EXIT
 if (( from_source )); then
-  command -v cargo >/dev/null || { echo 'Para compilar instala Rust: omarchy pkg add rust' >&2; exit 1; }
+  command -v cargo >/dev/null || { echo 'To build, install Rust: omarchy pkg add rust' >&2; exit 1; }
   cargo_args=(build --release --locked --manifest-path "$project_dir/Cargo.toml")
   (( !offline )) || cargo_args+=(--offline)
   cargo "${cargo_args[@]}"
   binary="$project_dir/target/release/omalogi"
 elif [[ -z $binary ]]; then
-  [[ $(uname -m) == x86_64 ]] || { echo 'La beta precompilada soporta x86_64. Otros equipos requieren --from-source y validación propia.' >&2; exit 1; }
+  [[ $(uname -m) == x86_64 ]] || { echo 'The prebuilt beta supports x86_64. Other systems require --from-source and their own validation.' >&2; exit 1; }
   for command in curl tar sha256sum; do
-    command -v "$command" >/dev/null || { echo "Falta la dependencia: $command" >&2; exit 1; }
+    command -v "$command" >/dev/null || { echo "Missing dependency: $command" >&2; exit 1; }
   done
-  (( !offline )) || { echo 'Usa --binary o --from-source con --offline.' >&2; exit 1; }
+  (( !offline )) || { echo 'Use --binary or --from-source with --offline.' >&2; exit 1; }
   temporary_dir=$(mktemp -d)
   asset="omalogi-v${version}-x86_64-unknown-linux-musl.tar.gz"
   base="https://github.com/AlejandroFloresArroyo/omalogi/releases/download/v${version}"
   curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 "$base/$asset" -o "$temporary_dir/$asset"
   curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 "$base/$asset.sha256" -o "$temporary_dir/$asset.sha256"
-  (cd "$temporary_dir" && sha256sum --check --status "$asset.sha256") || { echo 'El checksum del binario no coincide.' >&2; exit 1; }
+  (cd "$temporary_dir" && sha256sum --check --status "$asset.sha256") || { echo 'The binary checksum does not match.' >&2; exit 1; }
   tar -xzf "$temporary_dir/$asset" -C "$temporary_dir" -- omalogi
   binary="$temporary_dir/omalogi"
 fi
 binary=$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$binary")
-[[ -x $binary && ! -L $binary ]] || { echo 'No se encontró un ejecutable regular de Omalogi.' >&2; exit 1; }
-[[ $("$binary" --version) == "omalogi $version" ]] || { echo 'La versión del binario no coincide con la del plugin.' >&2; exit 1; }
+[[ -x $binary && ! -L $binary ]] || { echo 'No regular Omalogi executable was found.' >&2; exit 1; }
+[[ $("$binary" --version) == "omalogi $version" ]] || { echo 'The binary version does not match the plugin version.' >&2; exit 1; }
 python3 "$project_dir/scripts/install-files.py" preflight "$project_dir" --binary "$binary"
 if [[ -f "$HOME/.config/omarchy-logi/install.json" ]]; then
   legacy_stopped=1
@@ -95,7 +95,7 @@ elif systemctl --user is-active --quiet omalogi-solaar.service; then
   systemctl --user stop omalogi-solaar.service
   current_stopped=1
 elif pgrep -x solaar >/dev/null; then
-  echo 'Solaar está abierto fuera del servicio de Omalogi. Ciérralo y vuelve a instalar.' >&2; exit 1
+  echo 'Solaar is running outside the Omalogi service. Close it and reinstall.' >&2; exit 1
 fi
 python3 "$project_dir/scripts/install-files.py" install "$project_dir" --binary "$binary"
 systemctl --user daemon-reload
@@ -103,4 +103,4 @@ systemctl --user enable --now omalogi-solaar.service
 systemctl --user is-active --quiet omalogi-solaar.service
 omarchy-shell shell rescanPlugins
 omarchy plugin enable omalogi.mouse --section right
-echo 'Omalogi instalado. Abre: ~/.local/bin/omalogi panel'
+echo 'Omalogi installed. Open: ~/.local/bin/omalogi panel'

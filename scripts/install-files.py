@@ -54,27 +54,27 @@ class Installation:
     def receipt(path, allowed):
         data = json.loads(path.read_text()) if path.exists() else {"files": []}
         if not isinstance(data.get("files"), list) or any(not isinstance(n, str) or Path(n) not in allowed for n in data["files"]):
-            raise ValueError(f"Registro de instalación con rutas desconocidas: {path}")
+            raise ValueError(f"Installation record contains unknown paths: {path}")
         return data
 
     def preflight(self):
         migrating = (self.legacy / "install.json").exists()
         if migrating and self.app.exists():
-            raise ValueError("Hay dos directorios de configuración. Conserva ambos y resuelve el conflicto antes de migrar")
+            raise ValueError("Two configuration directories exist. Keep both and resolve the conflict before migrating")
         if self.legacy.exists() and not migrating:
-            raise ValueError("Hay configuración anterior sin registro de instalación; no se migra automáticamente")
+            raise ValueError("Previous configuration has no installation record; automatic migration is unavailable")
         old = self.receipt(self.legacy / "install.json" if migrating else self.app / "install.json",
                            self.legacy_paths if migrating else self.allowed)
         if not self.native and (self.plugin / ".git").exists():
             raise ValueError("Ejecuta el instalador desde el checkout del plugin instalado para conservar sus actualizaciones Git")
         if self.native and (old.get("pluginMode") == "copy"):
-            raise ValueError("El registro pertenece a una instalación desde fuentes; reinstálala desde el checkout original")
+            raise ValueError("The record belongs to a source installation; reinstall from the original checkout")
         targets = self.backend_paths | (set() if self.native else self.plugin_paths)
         for path in targets:
             if path.is_symlink() or (path.exists() and str(path) not in old["files"]):
-                raise ValueError(f"No se sobrescribe un archivo preexistente ajeno: {path}")
+                raise ValueError(f"An existing unrelated file will not be overwritten: {path}")
             if any(p.is_symlink() for p in path.parents if p != self.home and p != self.config):
-                raise ValueError(f"No se instala a través de un enlace simbólico: {path}")
+                raise ValueError(f"Installation through a symbolic link is not allowed: {path}")
         # Read every input before the first write.
         sources = {self.home / ".local/bin/omalogi": self.binary}
         if not self.native:
@@ -84,7 +84,7 @@ class Installation:
         if migrating:
             state = self.legacy / "state.json"
             if state.exists() and json.loads(state.read_text()).get("pending"):
-                raise ValueError("Hay una operación pendiente. Restaura el mouse con la CLI anterior antes de migrar")
+                raise ValueError("An operation is pending. Restore the mouse with the previous CLI before migrating")
             self.migrated_rules()  # Reject malformed managed blocks before stopping services.
         return migrating, old, contents
 
@@ -97,7 +97,7 @@ class Installation:
         if begin not in text and end not in text:
             return None
         if text.count(begin) != 1 or text.count(end) != 1 or not text.startswith(begin) or "# BEGIN OMALOGI" in text or "# END OMALOGI" in text:
-            raise ValueError("Bloque anterior de reglas dañado; no se modifica")
+            raise ValueError("Previous rule block is damaged; left unchanged")
         boundary = text.index(end) + len(end)
         block, outside = text[:boundary], text[boundary:]
         # Only rewrite the managed block; foreign bytes and hardware persistence stay untouched.
@@ -197,7 +197,7 @@ Categories=Settings;HardwareSettings;
     def uninstall(self):
         path = self.app / "install.json"
         if not path.exists():
-            raise ValueError("No hay una instalación administrada")
+            raise ValueError("No managed installation found")
         with (self.app / "operation.lock").open("a+") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             receipt = self.receipt(path, self.allowed)

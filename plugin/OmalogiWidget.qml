@@ -17,7 +17,7 @@ Panel {
         id: button
         bar: root.bar
         text: "󰍽"
-        tooltipText: "Omalogi · configurar MX Master"
+        tooltipText: "Omalogi · configure MX Master"
         onPressed: function(button) { if (button === Qt.LeftButton) root.toggle() }
     }
     OmalogiPanel { id: panel; ownerWidget: root; anchorItem: button; bar: root.bar }
