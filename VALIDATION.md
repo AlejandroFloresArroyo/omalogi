@@ -68,7 +68,17 @@ El proyecto se renombró a Omalogi, con CLI `omalogi`, plugin `omalogi.mouse`, c
 - Siete contratos Rust y 28 pruebas Python aprobadas. Nueve pruebas nuevas cubren instalación, reinstalación, archivos ajenos, checkout nativo de Git, migración, operación pendiente, directorios de configuración en conflicto, rollback ante fallo de escritura y restricciones de desinstalación.
 - Formato Rust y Clippy sin advertencias aprobados. La prueba nativa QML aislada aprobó agrupación, cola, cierre/reapertura, finalización en segundo plano y error/reintento. La ejecución requiere acceso a una sesión gráfica; un intento dentro del sandbox no pudo abrir Wayland y no se cuenta como resultado del producto.
 - Migración real mediante el instalador desde fuentes: el perfil y el snapshot original se conservaron; las reglas propias cambiaron de marcadores y ruta de ejecutable. El servicio anterior se retiró y `omalogi-solaar.service` quedó activo y habilitado. La consulta posterior devolvió `ok: true`, `applied: true`, `pending: false`, `daemon: true`. El shell descubrió el plugin con nombre Omalogi y `enabled: true`.
-- Archivo local de distribución generado y checksum comprobado con el binario GNU del equipo. La release pública usa un build musl separado en GitHub Actions; ese workflow aún no ha sido ejecutado en GitHub.
+- Archivo local de distribución generado y checksum comprobado con el binario GNU del equipo. La release pública usa un build musl separado en GitHub Actions; ese workflow estaba pendiente al cerrar la preparación; su resultado se registra abajo.
 - Vista previa pública de los componentes nativos generada con datos de dispositivo simulados y fondo opaco; no se incluyen el serial real ni los registros locales.
 
 Esta preparación no certifica una sesión nueva, una instalación en otro equipo, el workflow remoto ni pruebas físicas adicionales de gestos y ruedas después de la migración. Los pasos de publicación están en [docs/PUBLISHING.md](docs/PUBLISHING.md).
+
+## Publicación en GitHub — 2026-09-29
+
+- Código en `main` y etiqueta `v0.1.0-beta.1` publicados. La beta está disponible en [GitHub Releases](https://github.com/AlejandroFloresArroyo/omalogi/releases/tag/v0.1.0-beta.1).
+- GitHub Actions aprobó [Checks en main](https://github.com/AlejandroFloresArroyo/omalogi/actions/runs/36650398640), [Checks en la etiqueta](https://github.com/AlejandroFloresArroyo/omalogi/actions/runs/36650399307) y [Release](https://github.com/AlejandroFloresArroyo/omalogi/actions/runs/36650399296).
+- El binario Linux x86_64 musl de la release se descargó y verificó localmente: versión correcta, ausencia de intérprete ELF, contenido del archivo limitado al ejecutable y licencia, checksum correcto y coincidencia con los digests de los assets subidos a GitHub.
+- Doce pruebas de transacciones aprobaron usando ese binario y procesos de Solaar simulados. No se escribió al hardware.
+- Tras publicar, el archivo y su checksum se descargaron sin autenticación por las mismas URLs que usa el instalador; la verificación aprobó.
+
+La publicación en GitHub no constituye una admisión al catálogo de Omarchy Plugins. La nueva sesión gráfica real y la instalación en un segundo entorno limpio continúan pendientes.

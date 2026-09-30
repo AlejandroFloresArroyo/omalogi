@@ -23,7 +23,7 @@ The panel and documentation are initially in Spanish. [Detailed usage in Spanish
 
 ## Install from Omarchy Plugins
 
-Once the matching binary release is published:
+The [first beta release](https://github.com/AlejandroFloresArroyo/omalogi/releases/tag/v0.1.0-beta.1) includes a Linux x86_64 binary:
 
 ```bash
 omarchy plugin add https://github.com/AlejandroFloresArroyo/omalogi.git

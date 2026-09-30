@@ -2,7 +2,9 @@
 
 Repository: https://github.com/AlejandroFloresArroyo/omalogi
 
-Plugin ID: `omalogi.mouse`. First release: `v0.1.0-beta.1`.
+Plugin ID: `omalogi.mouse`. First release: [`v0.1.0-beta.1`](https://github.com/AlejandroFloresArroyo/omalogi/releases/tag/v0.1.0-beta.1), published on 2026-09-29.
+
+The initial tag and release already exist. For subsequent releases, increment the version and use the new tag in the commands below.
 
 ## Before publishing
 
