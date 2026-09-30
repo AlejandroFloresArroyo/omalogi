@@ -1,0 +1,22 @@
+[package]
+name = "omalogi"
+version = "0.1.0-beta.1"
+edition = "2024"
+description = "Logitech MX controls integrated with the Omarchy desktop"
+license = "MIT"
+repository = "https://github.com/AlejandroFloresArroyo/omalogi"
+homepage = "https://github.com/AlejandroFloresArroyo/omalogi"
+readme = "README.md"
+rust-version = "1.89"
+
+[dependencies]
+clap = { version = "4.6", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = true
+lto = "thin"

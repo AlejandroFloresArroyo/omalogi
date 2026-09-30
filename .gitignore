@@ -1,0 +1,10 @@
+/target/
+/dist/
+/artifacts/
+/solaar-src/
+/.impeccable/
+/.agents/
+/.codex/
+/.aws/
+__pycache__/
+*.py[cod]

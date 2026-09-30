@@ -1,0 +1,52 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  binary:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust and musl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools python3-yaml
+          rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
+          rustup override set 1.98.0
+          rustup target add x86_64-unknown-linux-musl
+      - name: Validate tag and test
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 scripts/check-distribution.py --tag "$RELEASE_TAG"
+          cargo fmt --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
+          python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Build and package
+        run: |
+          cargo build --release --locked --target x86_64-unknown-linux-musl
+          python3 scripts/package-release.py --binary target/x86_64-unknown-linux-musl/release/omalogi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omalogi-release
+          path: dist/*
+  draft:
+    needs: binary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: omalogi-release
+          path: dist
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release create "$RELEASE_TAG" dist/* --repo "$REPOSITORY" --draft --prerelease --title "Omalogi $RELEASE_TAG" --notes "Beta for MX Master 3S via Bolt on Omarchy. Includes a Linux x86_64 binary and SHA256 checksum. See README for setup and compatibility; release validation is recorded in VALIDATION.md."

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "omalogi.mouse",
+  "name": "Omalogi",
+  "version": "0.1.0-beta.1",
+  "author": "Alejandro Flores Arroyo",
+  "description": "Controles del MX Master: gestos, DPI, botones y ruedas",
+  "kinds": ["bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {"barWidget": "plugin/OmalogiWidget.qml"},
+  "barWidget": {"displayName": "Omalogi", "category": "Hardware", "defaultSection": "right", "allowMultiple": false}
+}

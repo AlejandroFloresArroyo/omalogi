@@ -1,0 +1,15 @@
+# Panel Omalogi
+
+Modo: Operate. Plataforma: Linux/Wayland, QML y Quickshell.
+
+Solicitud del usuario: abrir como el panel flotante de AI Usage; representar el MX Master conectado con un dibujo vectorial inspirado en la referencia OpenLogi; reunir DPI, gestos y botones en una pantalla y separar los extras de las ruedas. Respuesta confirmada: las acciones de ambas ruedas también deben estar junto al dibujo.
+
+La composición está fijada por esa referencia y el sistema visual por Omarchy. Es una reorganización dentro del escritorio existente: controles `qs.Ui`, tokens `qs.Commons`, texto en español. La referencia usa otro modelo; el dibujo representa el MX Master 3S detectado, con rueda vertical, rueda del pulgar, botones laterales y superficie de gestos. La foto posterior aportada por el usuario (`/tmp/codex-clipboard-B22lZz.png`) fija el contorno casi cenital: cuerpo ancho, apoyo lateral del pulgar, rueda vertical recta y separación real de los botones superiores. Es la autoridad para el dibujo; la referencia OpenLogi solo fija la composición del panel.
+
+Primer viewport: panel anclado al widget, cabecera con identidad real, pestañas Mouse/Extras, sensibilidad horizontal, diagrama central y asignaciones a ambos lados. Los cinco gestos, los dos botones laterales y las cuatro acciones de giro permanecen visibles simultáneamente. Estado automático siempre visible. El usuario pidió eliminar Actualizar y Cerrar y reemplazar Guardar/Aplicar por cambios automáticos; Restaurar queda en Extras y los errores ofrecen reintento o recuperación.
+
+Interacción propia: pasar por una asignación resalta su control físico; pulsar un control del diagrama abre su selector. Los cambios se aplican automáticamente después de 450 ms de pausa (el slider espera a soltarse). Solo se ejecuta una transacción por vez; los cambios siguientes conservan el último valor. Cerrar, incluso durante una mutación, libera el overlay y deja continuar la operación en el componente persistente. No bloquear el escritorio para proteger una transacción. Los errores conservan el valor y requieren reintento explícito o una nueva edición; no hay bucle de reintentos.
+
+Extras: inversión y resolución de ruedas, modo de giro, SmartShift y diagnóstico. Navegar conserva el borrador. Las operaciones y reglas del backend mantienen la verificación, exclusión mutua, respaldo y rollback; se omiten escrituras redundantes. Con perfil activo, DPI e inversiones verifican los ajustes modificados mediante el adaptador Solaar en una conexión; cambios de acciones sin cambiar captura actualizan reglas. Los cambios de modo y SmartShift conservan la transacción completa.
+
+Verificación: ambas vistas en el escritorio real, geometría de panel flotante y ausencia de ventana en mosaico; apertura/cierre durante mutación, reapertura, cola de última edición, agrupación y errores. La prueba nativa aislada usa los componentes reales con un CLI simulado lento y no certifica el clic físico del usuario. Sin detector web sobre QML. Revisión independiente tras las capturas. La prueba de inicio en una sesión nueva del MVP continúa pendiente del usuario.
