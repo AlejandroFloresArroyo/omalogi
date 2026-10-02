@@ -4,10 +4,15 @@ use std::{
     io::{Read, Write},
     process::{Command, Stdio},
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+pub const SERVICE: &str = "omalogi-solaar.service";
 const CLI: &str = include_str!("../scripts/solaar-cli.py");
+// On start, Solaar scans each device's features and replays its settings: about three
+// seconds of HID++ replies on the node a query would share. Systemd reports the start in
+// whole seconds, so up to one second of this is rounding.
+pub const SETTLE: Duration = Duration::from_secs(6);
 
 pub fn run(program: &str, args: &[&str], input: Option<&str>) -> Result<String, String> {
     let mut child = Command::new(program)
@@ -87,8 +92,45 @@ pub struct Device {
     pub buttons: BTreeMap<String, String>,
 }
 
+pub fn settle_remaining(show: &str, now_ms: u128) -> Duration {
+    let field = |name| show.lines().find_map(|line| line.strip_prefix(name));
+    let started = field("ActiveEnterTimestamp=@").and_then(|s| s.parse::<u128>().ok());
+    match (field("ActiveState="), started) {
+        (Some("active"), Some(started)) => {
+            let age = now_ms.saturating_sub(started * 1000);
+            SETTLE.saturating_sub(Duration::from_millis(age.min(u64::MAX as u128) as u64))
+        }
+        _ => Duration::ZERO,
+    }
+}
+
+// Two processes on one HID++ node read each other's replies. Transactions stop the
+// service first; every other query stays out of its startup scan.
+fn settle() {
+    let show = run(
+        "systemctl",
+        &[
+            "--user",
+            "show",
+            SERVICE,
+            "--timestamp=unix",
+            "-p",
+            "ActiveState",
+            "-p",
+            "ActiveEnterTimestamp",
+        ],
+        None,
+    )
+    .unwrap_or_default();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    thread::sleep(settle_remaining(&show, now.as_millis()));
+}
+
 /// `solaar config` through the selection adapter, which also finds a mouse by unit ID.
 pub fn config(args: &[&str]) -> Result<String, String> {
+    settle();
     let mut command = vec!["-c", CLI, "config"];
     command.extend_from_slice(args);
     run("python3", &command, None).map_err(|e| e.replacen("python3: ", "solaar: ", 1))
@@ -216,6 +258,7 @@ pub fn device(id: &str, name: &str) -> Result<Device, String> {
 }
 
 pub fn discover() -> Result<Vec<Device>, String> {
+    settle();
     // With no receiver and no connected Bluetooth mouse, Solaar has nothing to list.
     let text = match run("solaar", &["show"], None) {
         Err(e) if absent(&e) => String::new(),

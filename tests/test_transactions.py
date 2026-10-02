@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 import yaml
 
@@ -254,5 +255,40 @@ exit 1
         self.assertEqual((rc,result["ok"]),(1,False))
         self.assertNotIn("Traceback",result["error"])
         self.assertIn("Bluetooth",result["error"])
+
+class ServiceStartupTests(unittest.TestCase):
+    """Solaar scans the mouse when its service starts; the CLI must not query during that scan."""
+    transport = "Bolt"; identity = TransactionTests.identity
+    setUp = TransactionTests.setUp; tearDown = TransactionTests.tearDown; cli = TransactionTests.cli
+
+    def status(self, started_seconds_ago):
+        (self.root/"bin/systemctl").write_text(f"""#!/bin/sh
+[ "$2" = show ] && echo ActiveState=active && echo ActiveEnterTimestamp=@{int(time.time())-started_seconds_ago}
+exit 0
+""")
+        return subprocess.Popen([str(BINARY),"status"],text=True,stdout=subprocess.PIPE,env=self.env)
+
+    def test_no_query_reaches_the_mouse_while_the_service_scans_it(self):
+        self.scan()
+
+    def test_a_saved_profile_does_not_skip_the_wait(self):
+        # The panel refreshes this way right after Restore restarts the service.
+        _,status=self.cli("status")
+        self.assertEqual(self.cli("config","--stdin",input=status["config"])[0],0)
+        (self.config.parent/"calls.jsonl").unlink()
+        self.scan()
+
+    def scan(self):
+        calls = self.config.parent/"calls.jsonl"
+        process = self.status(0)
+        time.sleep(3)  # Solaar's own scan was measured at about three seconds.
+        self.assertFalse(calls.exists(), "queried the mouse during the startup scan")
+        self.assertTrue(json.loads(process.communicate(timeout=20)[0])["ok"])
+        self.assertTrue(calls.read_text())
+
+    def test_a_settled_service_does_not_delay_queries(self):
+        begin = time.monotonic()
+        self.assertTrue(json.loads(self.status(60).communicate(timeout=20)[0])["ok"])
+        self.assertLess(time.monotonic()-begin, 3)
 
 if __name__=="__main__": unittest.main()

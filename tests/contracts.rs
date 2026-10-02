@@ -4,7 +4,7 @@ use omalogi::{
     engine::default_config,
     rules, storage,
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
 
 fn device() -> Device {
     Device {
@@ -90,6 +90,36 @@ fn transport_comes_from_the_selection_adapter_and_is_optional_in_saved_state() {
     )
     .unwrap();
     assert_eq!(saved.transport, "");
+}
+#[test]
+fn queries_wait_out_the_solaar_service_startup_scan() {
+    let started = "ActiveState=active\nActiveEnterTimestamp=@1000\n";
+    let remaining = |text, now_ms| backend::settle_remaining(text, now_ms);
+    assert_eq!(remaining(started, 1_000_000), backend::SETTLE);
+    assert_eq!(
+        remaining(started, 1_001_500),
+        backend::SETTLE - Duration::from_millis(1500)
+    );
+    assert_eq!(
+        remaining(started, 1_000_000 + backend::SETTLE.as_millis()),
+        Duration::ZERO
+    );
+    assert_eq!(remaining(started, 9_000_000), Duration::ZERO);
+    // A clock stepped backwards must not turn into an unbounded wait.
+    assert_eq!(remaining(started, 0), backend::SETTLE);
+    // Transactions stop the service before touching the mouse: nothing to wait for.
+    assert_eq!(
+        remaining(
+            "ActiveState=inactive\nActiveEnterTimestamp=@1000\n",
+            1_000_000
+        ),
+        Duration::ZERO
+    );
+    assert_eq!(
+        remaining("ActiveState=active\nActiveEnterTimestamp=\n", 1_000_000),
+        Duration::ZERO
+    );
+    assert_eq!(remaining("", 1_000_000), Duration::ZERO);
 }
 #[test]
 fn parses_actual_cli_shapes_and_keeps_choices_per_setting() {

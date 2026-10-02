@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
 
-const SERVICE: &str = "omalogi-solaar.service";
+const SERVICE: &str = backend::SERVICE;
 const PYTHON: &str = include_str!("../scripts/solaar-state.py");
 const SCALAR: &str = include_str!("../scripts/solaar-scalar.py");
 
