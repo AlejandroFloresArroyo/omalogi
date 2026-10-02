@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Detect and configure an MX Master paired directly over Bluetooth. Solaar reports no serial for such a mouse, so it is identified and selected by unit ID.
+- The panel header and `omalogi status` report the live transport (`Bolt`, `Bluetooth`, `USB`) instead of a fixed label.
+- A mouse that is off, asleep or out of range is reported with a short message instead of Solaar's traceback.
+
+Bluetooth is covered by simulated tests and by tests against Solaar 1.1.20's own device matching. It has not been exercised on a physical Bluetooth connection; see VALIDATION.md.
+
 ## 0.1.0-beta.2
 
 - Use English throughout the desktop panel, action menus, accessibility labels, CLI and installation messages.

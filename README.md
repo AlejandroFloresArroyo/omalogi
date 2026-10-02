@@ -8,13 +8,14 @@ Omalogi adds a mouse widget to the Omarchy bar. Its popup saves and applies chan
 
 Preview rendered with simulated device data in the native Omarchy components.
 
-**Beta compatibility:** MX Master 3S connected through a Logitech Bolt receiver, Omarchy 4.0.4, Quickshell 0.3.1, Hyprland 0.56.2 and Solaar 1.1.20. Other models, Bluetooth and other software versions are not yet validated. A real new-session startup and installation on a second clean machine remain pending; see [VALIDATION.md](VALIDATION.md).
+**Beta compatibility:** MX Master 3S connected through a Logitech Bolt receiver, Omarchy 4.0.4, Quickshell 0.3.1, Hyprland 0.56.2 and Solaar 1.1.20. A mouse paired directly over Bluetooth is supported in code and simulated tests, but has not yet been validated on hardware. Other models and other software versions are not yet validated. A real new-session startup and installation on a second clean machine remain pending; see [VALIDATION.md](VALIDATION.md).
 
 ## Features
 
 - DPI from the values reported by the sensor.
 - Gesture button click and four directions, plus back/forward button assignments.
 - Vertical and horizontal wheel actions, inversion, resolution, ratchet and SmartShift when supported.
+- Bolt receiver or direct Bluetooth connection; the panel header names the one in use.
 - Native Omarchy components, colors and typography.
 - Queued automatic application; the panel can close while changes finish in the background.
 - Selective persistence, preservation of foreign Solaar rules, rollback and original-state restoration.
@@ -32,7 +33,7 @@ bash "$HOME/.config/omarchy/plugins/omalogi.mouse/scripts/install.sh"
 
 The first command installs the plugin files. **Omarchy does not run dependency/build hooks:** the second command installs Solaar if missing, downloads the matching Linux x86_64 binary, verifies its SHA256 checksum, installs the user service and enables the widget.
 
-Run as your desktop user, without `sudo`. Installing Solaar may ask for your password in the terminal. Its Arch package includes Python dependencies and udev rules; reconnect the receiver if device permissions have not been refreshed. The installer accepts only Solaar 1.1.20 for this beta because its fast adapter uses internal Solaar APIs.
+Run as your desktop user, without `sudo`. Installing Solaar may ask for your password in the terminal. Its Arch package includes Python dependencies and udev rules; reconnect the receiver if device permissions have not been refreshed. For Bluetooth, pair and connect the mouse with the Omarchy Bluetooth panel first; Omalogi finds it the next time the panel opens. The installer accepts only Solaar 1.1.20 for this beta because its fast adapter uses internal Solaar APIs.
 
 If you already run Solaar separately, close that instance before setup. Omalogi runs a single Solaar instance in `omalogi-solaar.service`. It does not replace foreign Solaar rules or change other devices. Installing does not apply a mouse profile; changes begin when you edit the panel.
 

@@ -82,3 +82,30 @@ Esta preparación no certifica una sesión nueva, una instalación en otro equip
 - Tras publicar, el archivo y su checksum se descargaron sin autenticación por las mismas URLs que usa el instalador; la verificación aprobó.
 
 La publicación en GitHub no constituye una admisión al catálogo de Omarchy Plugins. La nueva sesión gráfica real y la instalación en un segundo entorno limpio continúan pendientes.
+
+## Soporte Bluetooth — 2026-10-01
+
+Estado: implementado y cubierto por pruebas simuladas; **sin prueba física por Bluetooth**. El mouse del equipo de desarrollo está emparejado solo con el receptor Bolt (`bluetoothctl devices` no lo lista y sus tres canales Easy-Switch están ocupados), así que emparejarlo por Bluetooth requiere una acción del usuario.
+
+Hechos comprobados leyendo Solaar 1.1.20 instalado (`/usr/lib/python3.14/site-packages`):
+
+- Un dispositivo directo no tiene registro de emparejamiento: `Device.serial` devuelve cadena vacía (`logitech_receiver/device.py`, `_serial = pairing_info["serial"] if pairing_info else None`). `solaar show` lo imprime como encabezado sin número de ranura, con `Serial number:` vacío y `Unit ID:` (`solaar/cli/show.py`, `_print_device`).
+- `solaar config <dispositivo>` compara serie, codename, tipo y nombre (`solaar/cli/__init__.py`, `_find_device`); el Unit ID no selecciona nada. Las reglas (`Device:`) y la persistencia (`_modelId` + `_unitId`) sí lo aceptan.
+- La regla udev de Solaar concede acceso a `hidraw` Bluetooth de Logitech (`KERNELS == "0005:046D:*"` en `42-logitech-unify-permissions.rules`).
+
+Comprobaciones completadas:
+
+- 10 contratos Rust y 57 pruebas Python aprobadas. Las transacciones (aplicar, restaurar, rollback, ruta incremental, operación interrumpida) se ejecutan dos veces: con el backend simulado como Bolt y como Bluetooth. El simulado Bluetooth rechaza la selección por Unit ID cuando se invoca `solaar config` sin el adaptador, igual que Solaar real.
+- `tests/test_solaar_cli.py` ejecuta los seis casos del adaptador contra el `_find_device` real de Solaar 1.1.20 con dispositivos simulados, además de una copia de referencia de sus reglas para entornos sin Solaar.
+- Mutation check: quitar la identificación por Unit ID, aceptar el Unit ID anidado en las features, quitar el valor por defecto de `transport` en estados guardados, saltarse el adaptador o quitar su coincidencia por Unit ID hace fallar al menos una prueba en cada caso.
+- Bolt real, solo lectura: la salida de `solaar config <serie>` y la del adaptador fueron idénticas salvo la línea final `# transport: Bolt` (53 y 54 líneas). `omalogi status` con el binario nuevo devolvió `ok: true`, `transport: Bolt`, 11 ajustes, 5 botones, `applied: true`, `pending: false`, `daemon: true`.
+- `scripts/test-panel.py` aprobó con el QML real, incluido el encabezado `Bluetooth · TEST1234 · Connected` con CLI simulado.
+
+Pendiente de evidencia física:
+
+- Emparejar el MX Master 3S por Bluetooth y confirmar que `omalogi status` devuelve `transport: Bluetooth` con el Unit ID como identificador.
+- Repetir `scripts/validate-hardware.py prepare`, los once eventos físicos, `verify` y `restore` por Bluetooth.
+- Suspensión y reconexión por Bluetooth: el nodo `hidraw` desaparece mientras el mouse duerme; falta confirmar que Solaar reaplica desvíos y ajustes al volver.
+- Escrituras por Bolt a través del adaptador: solo se comprobó la lectura. La selección del dispositivo es el único cambio en esa ruta.
+- Continuidad del perfil al pasar de Bolt a Bluetooth. Depende de que la serie informada por Bolt coincida con el Unit ID; coincide en el 3S observado y no se ha probado en otros modelos.
+
