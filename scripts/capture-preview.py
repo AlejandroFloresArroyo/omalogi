@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--dpi', default='1000')
 parser.add_argument('--page', choices=['Mouse', 'Extras'], default='Mouse')
+parser.add_argument('--transport', default='Bolt')
 parser.add_argument('--output', type=Path, default=ROOT/'docs/preview.png')
 args = parser.parse_args()
 FAKE = '''#!/usr/bin/python3
@@ -98,7 +99,7 @@ settings = {key:{'value':value,'choices':[str(n) for n in range(200,8001,50)] if
 actions = [{'id':key,'label':value} for key,value in [
     ('native','Default behavior'), ('none','No action'), ('apps','Applications'), ('menu','Omarchy menu'),
     ('scratchpad','Scratchpad'), ('workspace.previous','Previous workspace'), ('workspace.next','Next workspace')]]
-status = {'ok':True,'devices':[{'id':'PREVIEW','name':'MX Master 3S','settings':settings}], 'config':profile,
+status = {'ok':True,'devices':[{'id':'PREVIEW','name':'MX Master 3S','transport':args.transport,'settings':settings}], 'config':profile,
           'actions':actions,'events':[],'applied':True,'pending':False,'daemon':True}
 with tempfile.TemporaryDirectory(prefix='omalogi-preview-') as temp:
     base = Path(temp)

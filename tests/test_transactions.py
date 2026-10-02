@@ -17,8 +17,14 @@ p=Path(os.environ["XDG_CONFIG_HOME"])/"solaar/config.yaml"
 d=yaml.safe_load(p.read_text()); x=d[1]
 args=sys.argv[1:]
 with (p.parent/"calls.jsonl").open("a") as log: log.write(json.dumps(args)+"\\n")
+bluetooth=os.environ.get("FAKE_TRANSPORT")=="bluetooth"
+adapter=os.environ.get("OMALOGI_CLI")=="1"
 if args[0]=="show":
- print("Bolt Receiver\\n  1: MX Master 3S\\n     Serial number: A1B2C3D4"); sys.exit(0)
+ if bluetooth: print("solaar version 1.1.20\\n\\nMX Master 3S\\n     Device path  : /dev/hidraw11\\n     USB id       : 046d:B034\\n     Serial number: \\n     Model ID:      B03400000000\\n     Unit ID:       A1B2C3D4\\n")
+ else: print("Bolt Receiver\\n  1: MX Master 3S\\n     Serial number: A1B2C3D4")
+ sys.exit(0)
+# Stock `solaar config` cannot select a serial-less Bluetooth mouse by unit ID.
+if bluetooth and not adapter: sys.exit("solaar: error: no online device found matching '"+args[1].lower()+"'")
 transient=p.parent/"fail-read-once"
 if len(args)==2 and transient.exists(): transient.unlink(); sys.exit(1)
 key=args[2] if len(args)>2 else None
@@ -33,7 +39,7 @@ if len(args)>3:
  elif key=="scroll-ratchet": x[key]={"Ratcheted":2,"Freespinning":1}[value]
  else: x[key]=value.lower()=="true" if value.lower() in ("true","false") else int(value)
  p.write_text(yaml.safe_dump(d))
-print("MX Master 3S (MX Master 3S) [B034:A1B2C3D4]")
+print("MX Master 3S (MX Master 3S) "+("[None:]" if bluetooth else "[B034:A1B2C3D4]"))
 for k in ["dpi","scroll-ratchet","smart-shift","hires-smooth-invert","hires-smooth-resolution","hires-scroll-mode","thumb-scroll-invert","thumb-scroll-mode"]:
  if key and k!=key: continue
  v=1 if k=="smart-shift" and x["scroll-ratchet"]==1 else x[k]
@@ -43,12 +49,17 @@ for k in ["dpi","scroll-ratchet","smart-shift","hires-smooth-invert","hires-smoo
  print(f"{k} = {v}")
 if not key or key=="divert-keys":
  print("divert-keys = {"+", ".join(f"{label}:{'Regular' if x['divert-keys'][n]==0 else 'Diverted'}" for n,label in buttons.items())+"}")
+if adapter: print("# transport: "+("Bluetooth" if bluetooth else "Bolt"))
 '''
 
 FAKE_BRIDGE = '''#!/usr/bin/python3
 import json,os,subprocess,sys
 from pathlib import Path
-if len(sys.argv)>2 and sys.argv[2].startswith("# LOGI_SCALAR_BRIDGE"):
+# Both production adapters reach devices through Solaar's library; the fake `solaar` stands in for it.
+os.environ["OMALOGI_CLI"]="1"
+if len(sys.argv)>2 and sys.argv[2].startswith("# OMALOGI_SOLAAR_CLI"):
+ os.execvp("solaar",["solaar",*sys.argv[3:]])
+elif len(sys.argv)>2 and sys.argv[2].startswith("# LOGI_SCALAR_BRIDGE"):
  req=json.load(sys.stdin)
  p=Path(os.environ["XDG_CONFIG_HOME"])/"solaar/config.yaml"
  import yaml
@@ -68,12 +79,14 @@ else:
 '''
 
 class TransactionTests(unittest.TestCase):
+    transport = "Bolt"
+    identity = {"_serial":"A1B2C3D4"}
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         self.config = self.root / "solaar/config.yaml"
         self.config.parent.mkdir()
-        self.original = ["1.1.20", {"_serial":"A1B2C3D4","dpi":1000,"scroll-ratchet":2,"smart-shift":10,
+        self.original = ["1.1.20", {**self.identity,"dpi":1000,"scroll-ratchet":2,"smart-shift":10,
             "hires-smooth-invert":False,"hires-smooth-resolution":False,"hires-scroll-mode":False,
             "thumb-scroll-invert":False,"thumb-scroll-mode":False,"divert-keys":{83:0,86:0,195:2},"foreign":42}]
         self.config.write_text(yaml.safe_dump(self.original))
@@ -86,7 +99,7 @@ class TransactionTests(unittest.TestCase):
         bridge = fake/"python3"
         bridge.write_text(FAKE_BRIDGE)
         bridge.chmod(0o755)
-        self.env={**os.environ,"XDG_CONFIG_HOME":str(self.root),"PATH":str(fake)+":/usr/bin"}
+        self.env={**os.environ,"XDG_CONFIG_HOME":str(self.root),"PATH":str(fake)+":/usr/bin","FAKE_TRANSPORT":self.transport.lower()}
     def tearDown(self): self.temp.cleanup()
     def cli(self,*args,input=None, fail=False):
         p=subprocess.run([str(BINARY),*args],input=json.dumps(input) if input else None,
@@ -130,6 +143,13 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(yaml.safe_load(self.config.read_text())[1]["smart-shift"],12)
         self.assertEqual(self.cli("restore")[0],0)
         self.assertEqual(yaml.safe_load(self.config.read_text()),self.original)
+
+    def test_status_identifies_the_mouse_and_its_transport(self):
+        rc,status=self.cli("status")
+        self.assertEqual((rc,status["ok"]),(0,True))
+        device=status["devices"][0]
+        self.assertEqual((device["id"],device["name"],device["transport"]),("A1B2C3D4","MX Master 3S",self.transport))
+        self.assertEqual(status["config"]["device_id"],"A1B2C3D4")
 
     def test_startup_read_failure_is_retried_without_modifying_mouse(self):
         (self.config.parent/"fail-read-once").touch()
@@ -217,5 +237,22 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(self.cli("restore")[0],0)
         self.assertEqual(yaml.safe_load(self.config.read_text()),self.original)
         self.assertEqual((self.config.parent/"rules.yaml").read_text(),self.foreign)
+
+class BluetoothTransactionTests(TransactionTests):
+    """The same transactions for a mouse Solaar persists by model and unit ID, without a serial."""
+    transport = "Bluetooth"
+    identity = {"_NAME":"MX Master 3S","_modelId":"B03400000000","_unitId":"A1B2C3D4"}
+
+    def test_a_sleeping_mouse_is_reported_without_a_traceback(self):
+        asleep='''#!/bin/sh
+echo "solaar: error: Traceback (most recent call last):" >&2
+echo "Exception: No supported device found. Use \\"lsusb\\" and \\"bluetoothctl devices Connected\\" to list connected devices." >&2
+exit 1
+'''
+        solaar=self.root/"bin/solaar"; solaar.write_text(asleep)
+        rc,result=self.cli("status")
+        self.assertEqual((rc,result["ok"]),(1,False))
+        self.assertNotIn("Traceback",result["error"])
+        self.assertIn("Bluetooth",result["error"])
 
 if __name__=="__main__": unittest.main()

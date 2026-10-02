@@ -551,7 +551,7 @@ impl Engine {
         }
         .ok_or("No supported DPI presets")?;
         backend::set(&device.id, "dpi", &next.to_string())?;
-        let live = backend::run("solaar", &["config", &device.id, "dpi"], None)?;
+        let live = backend::config(&[&device.id, "dpi"])?;
         let (readback, _) = backend::parse_settings(&live);
         if readback
             .get("dpi")

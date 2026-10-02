@@ -12,7 +12,7 @@ from unittest.mock import patch
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/solaar-scalar.py'
 
 class ScalarBridgeTests(unittest.TestCase):
-    def bridge(self, desired='1600', fail=False, rollback_fail=False, serial='A1B2C3D4', stale=False):
+    def bridge(self, desired='1600', fail=False, rollback_fail=False, serial='A1B2C3D4', stale=False, direct=False):
         class Setting:
             kind = 'choice'
             choices = [1000, 1600, 8000]
@@ -29,8 +29,10 @@ class ScalarBridgeTests(unittest.TestCase):
                 self.value = value
                 return None if fail and value == 1600 else value
         setting = Setting()
-        dev = types.SimpleNamespace(serial=serial, unitId=serial, ping=lambda: True)
-        receiver = types.SimpleNamespace(close=lambda: None)
+        # A Bluetooth mouse is itself a top-level entry and reports no serial, only a unit ID.
+        dev = types.SimpleNamespace(serial='' if direct else serial, unitId=serial, isDevice=True,
+                                    ping=lambda: True, close=lambda: None)
+        receiver = types.SimpleNamespace(isDevice=False, close=lambda: None)
         mods = {
             'logitech_receiver': types.ModuleType('logitech_receiver'),
             'logitech_receiver.settings': types.ModuleType('logitech_receiver.settings'),
@@ -40,8 +42,8 @@ class ScalarBridgeTests(unittest.TestCase):
         }
         mods['logitech_receiver.settings'].Kind = types.SimpleNamespace(CHOICE='choice', TOGGLE='toggle')
         mods['logitech_receiver.settings_templates'].check_feature_setting = lambda d,k: setting
-        mods['solaar.cli']._find_device = lambda receivers,ident: [dev]
-        mods['solaar.cli']._receivers_and_devices = lambda: [receiver]
+        mods['solaar.cli']._find_device = lambda receivers,ident: [] if direct else [dev]
+        mods['solaar.cli']._receivers_and_devices = lambda: [dev] if direct else [receiver]
         output = io.StringIO()
         with patch.dict(sys.modules, mods), patch('sys.stdin', io.StringIO(json.dumps({'id':'A1B2C3D4','values':{'dpi':desired}}))), contextlib.redirect_stdout(output):
             runpy.run_path(str(SCRIPT),run_name='__main__')
@@ -74,3 +76,12 @@ class ScalarBridgeTests(unittest.TestCase):
         result,s=self.bridge(stale=True)
         self.assertFalse(result['ok']); self.assertTrue(result['rolled_back'])
         self.assertEqual(s.writes,[1600,1000])
+
+    def test_bluetooth_mouse_without_serial_is_selected_by_unit_id(self):
+        result,s=self.bridge(direct=True)
+        self.assertTrue(result['ok']); self.assertEqual(result['before'],{'dpi':'1000'})
+        self.assertEqual((s.value,s.writes),(1600,[1600]))
+
+    def test_another_bluetooth_device_is_rejected_before_any_write(self):
+        result,s=self.bridge(serial='OTHER',direct=True)
+        self.assertFalse(result['ok']); self.assertEqual(s.writes,[])

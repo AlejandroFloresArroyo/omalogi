@@ -7,6 +7,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const CLI: &str = include_str!("../scripts/solaar-cli.py");
+
 pub fn run(program: &str, args: &[&str], input: Option<&str>) -> Result<String, String> {
     let mut child = Command::new(program)
         .args(args)
@@ -78,8 +80,23 @@ pub struct Setting {
 pub struct Device {
     pub id: String,
     pub name: String,
+    // How the mouse was reached at the last read: a receiver name, Bluetooth or USB.
+    #[serde(default)]
+    pub transport: String,
     pub settings: BTreeMap<String, Setting>,
     pub buttons: BTreeMap<String, String>,
+}
+
+/// `solaar config` through the selection adapter, which also finds a mouse by unit ID.
+pub fn config(args: &[&str]) -> Result<String, String> {
+    let mut command = vec!["-c", CLI, "config"];
+    command.extend_from_slice(args);
+    run("python3", &command, None).map_err(|e| e.replacen("python3: ", "solaar: ", 1))
+}
+
+// Solaar exits this way when the mouse is off, asleep or, over Bluetooth, has no device node.
+fn absent(error: &str) -> bool {
+    error.contains("no online device found") || error.contains("No supported device found")
 }
 
 pub fn discover_ids(text: &str) -> Vec<(String, String)> {
@@ -94,17 +111,33 @@ pub fn discover_ids(text: &str) -> Vec<(String, String)> {
             && slot.parse::<u32>().is_ok()
         {
             name = title.to_string();
+        } else if !line.is_empty() && !line.starts_with(' ') {
+            // A Bluetooth or wired device is a top-level heading without a slot.
+            name = line.to_string();
         }
+        // Such a device prints an empty serial; its unit ID, at the same depth, identifies it.
+        let id = line
+            .trim()
+            .strip_prefix("Serial number: ")
+            .or_else(|| line.strip_prefix("     Unit ID:").map(str::trim));
         if name.starts_with("MX Master")
-            && let Some(serial) = line.trim().strip_prefix("Serial number: ")
-            && !serial.is_empty()
-            && serial != "None"
+            && let Some(id) = id
+            && !id.is_empty()
+            && id != "None"
+            && id != "00000000"
         {
-            devices.push((serial.into(), name.clone()));
+            devices.push((id.into(), name.clone()));
             name.clear();
         }
     }
     devices
+}
+
+pub fn transport(text: &str) -> String {
+    text.lines()
+        .find_map(|line| line.strip_prefix("# transport: "))
+        .unwrap_or_default()
+        .into()
 }
 
 pub fn parse_settings(text: &str) -> (BTreeMap<String, Setting>, BTreeMap<String, String>) {
@@ -148,15 +181,21 @@ pub fn parse_settings(text: &str) -> (BTreeMap<String, Setting>, BTreeMap<String
 pub fn device(id: &str, name: &str) -> Result<Device, String> {
     // A fresh GUI scans the same HID++ receiver. Retry transient transport
     // assertions rather than misreporting a disconnected mouse at startup.
-    let mut result = run("solaar", &["config", id], None);
+    let mut result = config(&[id]);
     for _ in 0..2 {
         if result.is_ok() {
             break;
         }
         thread::sleep(Duration::from_millis(300));
-        result = run("solaar", &["config", id], None);
+        result = config(&[id]);
     }
-    let text = result?;
+    let text = result.map_err(|e| {
+        if absent(&e) {
+            "The mouse is not responding; turn it on and move the pointer".into()
+        } else {
+            e
+        }
+    })?;
     let (settings, buttons) = parse_settings(&text);
     if !settings.contains_key("dpi") {
         return Err("The mouse is not responding; turn it on and move the pointer".into());
@@ -170,13 +209,18 @@ pub fn device(id: &str, name: &str) -> Result<Device, String> {
     Ok(Device {
         id: id.into(),
         name: actual_name.into(),
+        transport: transport(&text),
         settings,
         buttons,
     })
 }
 
 pub fn discover() -> Result<Vec<Device>, String> {
-    let text = run("solaar", &["show"], None)?;
+    // With no receiver and no connected Bluetooth mouse, Solaar has nothing to list.
+    let text = match run("solaar", &["show"], None) {
+        Err(e) if absent(&e) => String::new(),
+        other => other?,
+    };
     let mut result = Vec::new();
     let mut failures = Vec::new();
     for (id, name) in discover_ids(&text) {
@@ -189,17 +233,20 @@ pub fn discover() -> Result<Vec<Device>, String> {
         if let Some(error) = failures.into_iter().next() {
             return Err(error);
         }
-        return Err("No MX Master is connected. Check Bolt and turn on the mouse".into());
+        return Err(
+            "No MX Master is connected. Check the Bolt receiver or Bluetooth pairing and turn on the mouse"
+                .into(),
+        );
     }
     Ok(result)
 }
 
 pub fn set(id: &str, key: &str, value: &str) -> Result<(), String> {
-    run("solaar", &["config", id, key, value], None).map(|_| ())
+    config(&[id, key, value]).map(|_| ())
 }
 
 pub fn set_button(id: &str, key: &str, value: &str) -> Result<(), String> {
-    run("solaar", &["config", id, "divert-keys", key, value], None).map(|_| ())
+    config(&[id, "divert-keys", key, value]).map(|_| ())
 }
 
 pub fn write_settings(device: &Device, values: &BTreeMap<String, String>) -> Result<(), String> {
@@ -214,7 +261,7 @@ pub fn write_settings(device: &Device, values: &BTreeMap<String, String>) -> Res
             set(&device.id, "scroll-ratchet", "Ratcheted")?;
         }
         set(&device.id, "smart-shift", threshold)?;
-        let text = run("solaar", &["config", &device.id, "smart-shift"], None)?;
+        let text = config(&[&device.id, "smart-shift"])?;
         let (settings, _) = parse_settings(&text);
         if settings
             .get("smart-shift")

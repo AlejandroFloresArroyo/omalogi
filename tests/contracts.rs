@@ -10,6 +10,7 @@ fn device() -> Device {
     Device {
         id: "A1B2C3D4".into(),
         name: "MX Master 3S".into(),
+        transport: "Bolt".into(),
         settings: BTreeMap::from([
             (
                 "dpi".into(),
@@ -43,6 +44,52 @@ fn discovery_ignores_receiver_and_feature_serials() {
         backend::discover_ids(text),
         vec![("A1B2C3D4".into(), "MX Master 3S".into())]
     );
+}
+// Solaar 1.1.20 `show` prints a directly connected device as a top-level heading
+// without a slot, with an empty serial; its unit ID repeats under DEVICE FW VERSION.
+const BLUETOOTH_SHOW: &str = "solaar version 1.1.20\n\nMX Master 3S\n     Device path  : /dev/hidraw11\n     USB id       : 046d:B034\n     Codename     : MX Master 3S\n     Kind         : mouse\n     Protocol     : HID++ 4.5\n     Serial number: \n     Model ID:      B03400000000\n     Unit ID:       A1B2C3D4\n     Supports 36 HID++ 2.0 features:\n         2: DEVICE FW VERSION      {0003} V4     \n            Unit ID: A1B2C3D4  Model ID: B03400000000  Transport IDs: {'btleid': 'B034'}\n\n";
+
+#[test]
+fn discovery_identifies_a_bluetooth_mouse_by_unit_id() {
+    assert_eq!(
+        backend::discover_ids(BLUETOOTH_SHOW),
+        vec![("A1B2C3D4".into(), "MX Master 3S".into())]
+    );
+    // The same mouse stays paired, offline, on a receiver while it is on its Bluetooth channel.
+    let both = format!(
+        "Bolt Receiver\n  Serial       : AAAA\n\n  1: MX Master 3S\n     Device is offline.\n\n{BLUETOOTH_SHOW}"
+    );
+    assert_eq!(
+        backend::discover_ids(&both),
+        vec![("A1B2C3D4".into(), "MX Master 3S".into())]
+    );
+}
+#[test]
+fn discovery_ignores_direct_devices_without_a_usable_identity() {
+    let other = BLUETOOTH_SHOW.replace("MX Master 3S", "MX Keys Mini");
+    assert!(backend::discover_ids(&other).is_empty());
+    let zero = BLUETOOTH_SHOW.replace("Unit ID:       A1B2C3D4", "Unit ID:       00000000");
+    assert!(backend::discover_ids(&zero).is_empty());
+    assert!(backend::discover_ids("MX Master 3S\n     Device is offline.\n").is_empty());
+    // Without a top-level unit ID, the copy nested under the features is not an identity.
+    let nested = BLUETOOTH_SHOW.replace("     Unit ID:       A1B2C3D4\n", "");
+    assert!(backend::discover_ids(&nested).is_empty());
+}
+#[test]
+fn transport_comes_from_the_selection_adapter_and_is_optional_in_saved_state() {
+    assert_eq!(
+        backend::transport(
+            "MX Master 3S (MX Master 3S) [None:]\n\ndpi = 1000\n# transport: Bluetooth\n"
+        ),
+        "Bluetooth"
+    );
+    assert_eq!(backend::transport("dpi = 1000\n"), "");
+    // Snapshots written before transports were recorded must still load for Restore.
+    let saved: Device = serde_json::from_str(
+        r#"{"id":"A1B2C3D4","name":"MX Master 3S","settings":{},"buttons":{}}"#,
+    )
+    .unwrap();
+    assert_eq!(saved.transport, "");
 }
 #[test]
 fn parses_actual_cli_shapes_and_keeps_choices_per_setting() {
