@@ -46,6 +46,8 @@ Control labels can differ by variant. Candidates include `Back Button` (83), `Fo
 
 The CLI matches a serial, codename, kind, name substring, or receiver slot number; **unit ID is not a CLI selector**. Use the detected mouse serial. Receiver slot/name matching may select another device when several are attached. [CLI discovery](https://github.com/pwr-Solaar/Solaar/blob/1.1.20/lib/solaar/cli/__init__.py)
 
+A directly connected device (Bluetooth or wired) has no pairing record, so its `serial` is the empty string: `show` prints `Serial number: ` with no value, `config` prints `[None:]`, and no stock selector identifies one unit among several of the same model. Rules (`Device:`) and persistence (`_modelId` + `_unitId`) do accept the unit ID. `scripts/solaar-cli.py` therefore runs the same CLI with unit-ID matching added for top-level devices. [Device identity](https://github.com/pwr-Solaar/Solaar/blob/1.1.20/lib/logitech_receiver/device.py), [persistence match](https://github.com/pwr-Solaar/Solaar/blob/1.1.20/lib/solaar/configuration.py)
+
 `solaar show` exposes `Serial number:`, `Unit ID:`, `Model ID:` and device names. A receiver's `Serial:` is distinct from the mouse's serial; parse device sections before choosing. [Show source](https://github.com/pwr-Solaar/Solaar/blob/1.1.20/lib/solaar/cli/show.py)
 
 ## Rules for wheels and buttons

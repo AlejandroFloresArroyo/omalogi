@@ -1,5 +1,6 @@
 # LOGI_SCALAR_BRIDGE: one Solaar connection, only the requested scalar settings.
 # Solaar 1.1.20's installed HID++ library; capture/GUI remains the external service.
+from itertools import chain
 import json
 import sys
 
@@ -22,7 +23,10 @@ try:
     if not request["values"] or not set(request["values"]) <= allowed:
         raise ValueError("Unsupported scalar change")
     receivers = list(_receivers_and_devices())
-    dev = next((d for d in _find_device(receivers, request["id"].lower()) if d.ping()), None)
+    wanted = request["id"].lower()
+    # A Bluetooth mouse reports no serial for Solaar's lookup; match its unit ID directly.
+    direct = (d for d in receivers if d.isDevice and str(d.unitId).lower() == wanted)
+    dev = next((d for d in chain(direct, _find_device(receivers, wanted)) if d.ping()), None)
     if dev is None or request["id"].lower() not in (str(dev.serial).lower(), str(dev.unitId).lower()):
         raise ValueError("The selected mouse is not connected")
     for key, value in request["values"].items():

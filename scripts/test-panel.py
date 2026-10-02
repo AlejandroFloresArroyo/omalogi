@@ -15,7 +15,7 @@ root=Path(__file__).parent
 c=json.loads((root/'profile.json').read_text())
 op=sys.argv[1]
 if op=='status':
- d={'id':c['device_id'],'name':c['device_name'],'settings':{k:{'value':v,'choices':[str(n) for n in range(200,8001,50)] if k=='dpi' else ['Ratcheted','Freespinning'],'toggle':v in ['true','false']} for k,v in c['hardware'].items()}}
+ d={'id':c['device_id'],'name':c['device_name'],'transport':'Bluetooth','settings':{k:{'value':v,'choices':[str(n) for n in range(200,8001,50)] if k=='dpi' else ['Ratcheted','Freespinning'],'toggle':v in ['true','false']} for k,v in c['hardware'].items()}}
  print(json.dumps({'ok':True,'devices':[d],'config':c,'actions':[],'events':[],'applied':True,'pending':False,'daemon':True}))
 elif op=='apply':
  c=json.loads(sys.stdin.read())
@@ -68,6 +68,7 @@ ShellRoot {
             if (test.stage === 0) {
                 test.panel = widget.children[1]; widget.open(); test.stage = 1
             } else if (test.stage === 1 && !p.busy && p.profile) {
+                test.check(p.connection === "Bluetooth · TEST1234 · Connected", "header names the live transport")
                 p.patch("hardware","dpi","1600")
                 p.patch("hardware","dpi","2400")
                 p.patch("hardware","dpi","3200")

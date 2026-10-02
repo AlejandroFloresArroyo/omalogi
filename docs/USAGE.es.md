@@ -1,8 +1,10 @@
 # Omalogi
 
-MVP local para configurar un Logitech MX Master conectado por Bolt: DPI, botón de gestos, botones laterales y ambas ruedas. CLI en Rust, panel QML en el shell de Omarchy y Solaar externo para HID++ y eventos.
+MVP local para configurar un Logitech MX Master conectado por Bolt o por Bluetooth: DPI, botón de gestos, botones laterales y ambas ruedas. CLI en Rust, panel QML en el shell de Omarchy y Solaar externo para HID++ y eventos.
 
 La compatibilidad física validada corresponde al **MX Master 3S conectado por Bolt**. Los ajustes se limitan al dispositivo seleccionado; se conserva la configuración de los demás dispositivos.
+
+**Bluetooth:** empareja y conecta el mouse desde el panel Bluetooth de Omarchy; Omalogi lo detecta al abrir su panel y el encabezado indica `Bluetooth`. Por Bluetooth Solaar no informa número de serie, así que el mouse se identifica por su Unit ID. Si Solaar informa el mismo valor como serie por Bolt (ocurre en el 3S observado), el perfil sigue al mouse al cambiar de conexión. Esta ruta es experimental: se probó en el mismo mouse (detección, gestos, ruedas, DPI, aplicar, restaurar y reconexión), pero una primera prueba terminó con el mouse abandonando su canal Bluetooth. La causa probable ya se evita, aunque no está demostrada; consulta [VALIDATION.md](../VALIDATION.md).
 
 ## Instalar
 

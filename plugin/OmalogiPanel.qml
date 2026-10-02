@@ -37,6 +37,8 @@ Item {
     readonly property string binary: Quickshell.env("HOME") + "/.local/bin/omalogi"
     readonly property bool busy: mutate.running || status.running || binaryCheck.running
     readonly property color secondary: Qt.rgba(Color.popups.text.r, Color.popups.text.g, Color.popups.text.b, 0.78)
+    // A CLI older than this panel reports no transport; show the remaining facts.
+    readonly property string connection: device ? (device.transport ? device.transport + " · " : "") + device.id + " · " + (daemon ? "Connected" : "Event capture stopped") : "Connect and turn on your MX Master"
 
     function requestClose() { ownerWidget.close() }
     function refresh() {
@@ -205,7 +207,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: Style.spacing.labelGap
                         Text { text: root.device ? root.device.name : "Omalogi"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.heading; font.bold: true }
-                        Text { text: root.device ? "Bolt · " + root.device.id + " · " + (root.daemon ? "Connected" : "Event capture stopped") : "Connect and turn on your MX Master"; color: root.secondary; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                        Text { text: root.connection; color: root.secondary; font.family: Style.font.family; font.pixelSize: Style.font.caption }
                     }
                 }
                 RowLayout {

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
 
-const SERVICE: &str = "omalogi-solaar.service";
+const SERVICE: &str = backend::SERVICE;
 const PYTHON: &str = include_str!("../scripts/solaar-state.py");
 const SCALAR: &str = include_str!("../scripts/solaar-scalar.py");
 
@@ -551,7 +551,7 @@ impl Engine {
         }
         .ok_or("No supported DPI presets")?;
         backend::set(&device.id, "dpi", &next.to_string())?;
-        let live = backend::run("solaar", &["config", &device.id, "dpi"], None)?;
+        let live = backend::config(&[&device.id, "dpi"])?;
         let (readback, _) = backend::parse_settings(&live);
         if readback
             .get("dpi")

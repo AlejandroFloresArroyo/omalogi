@@ -4,12 +4,13 @@ use omalogi::{
     engine::default_config,
     rules, storage,
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
 
 fn device() -> Device {
     Device {
         id: "A1B2C3D4".into(),
         name: "MX Master 3S".into(),
+        transport: "Bolt".into(),
         settings: BTreeMap::from([
             (
                 "dpi".into(),
@@ -42,6 +43,145 @@ fn discovery_ignores_receiver_and_feature_serials() {
     assert_eq!(
         backend::discover_ids(text),
         vec![("A1B2C3D4".into(), "MX Master 3S".into())]
+    );
+}
+// Solaar 1.1.20 `show` prints a directly connected device as a top-level heading
+// without a slot, with an empty serial; its unit ID repeats under DEVICE FW VERSION.
+const BLUETOOTH_SHOW: &str = "solaar version 1.1.20\n\nMX Master 3S\n     Device path  : /dev/hidraw11\n     USB id       : 046d:B034\n     Codename     : MX Master 3S\n     Kind         : mouse\n     Protocol     : HID++ 4.5\n     Serial number: \n     Model ID:      B03400000000\n     Unit ID:       A1B2C3D4\n     Supports 36 HID++ 2.0 features:\n         2: DEVICE FW VERSION      {0003} V4     \n            Unit ID: A1B2C3D4  Model ID: B03400000000  Transport IDs: {'btleid': 'B034'}\n\n";
+
+#[test]
+fn discovery_identifies_a_bluetooth_mouse_by_unit_id() {
+    assert_eq!(
+        backend::discover_ids(BLUETOOTH_SHOW),
+        vec![("A1B2C3D4".into(), "MX Master 3S".into())]
+    );
+    // The same mouse stays paired, offline, on a receiver while it is on its Bluetooth channel.
+    let both = format!(
+        "Bolt Receiver\n  Serial       : AAAA\n\n  1: MX Master 3S\n     Device is offline.\n\n{BLUETOOTH_SHOW}"
+    );
+    assert_eq!(
+        backend::discover_ids(&both),
+        vec![("A1B2C3D4".into(), "MX Master 3S".into())]
+    );
+}
+#[test]
+fn discovery_ignores_direct_devices_without_a_usable_identity() {
+    let other = BLUETOOTH_SHOW.replace("MX Master 3S", "MX Keys Mini");
+    assert!(backend::discover_ids(&other).is_empty());
+    let zero = BLUETOOTH_SHOW.replace("Unit ID:       A1B2C3D4", "Unit ID:       00000000");
+    assert!(backend::discover_ids(&zero).is_empty());
+    assert!(backend::discover_ids("MX Master 3S\n     Device is offline.\n").is_empty());
+    // Without a top-level unit ID, the copy nested under the features is not an identity.
+    let nested = BLUETOOTH_SHOW.replace("     Unit ID:       A1B2C3D4\n", "");
+    assert!(backend::discover_ids(&nested).is_empty());
+}
+#[test]
+fn transport_comes_from_the_selection_adapter_and_is_optional_in_saved_state() {
+    assert_eq!(
+        backend::transport(
+            "MX Master 3S (MX Master 3S) [None:]\n\ndpi = 1000\n# transport: Bluetooth\n"
+        ),
+        "Bluetooth"
+    );
+    assert_eq!(backend::transport("dpi = 1000\n"), "");
+    // Snapshots written before transports were recorded must still load for Restore.
+    let saved: Device = serde_json::from_str(
+        r#"{"id":"A1B2C3D4","name":"MX Master 3S","settings":{},"buttons":{}}"#,
+    )
+    .unwrap();
+    assert_eq!(saved.transport, "");
+}
+#[test]
+fn queries_wait_out_the_solaar_service_startup_scan() {
+    let started = "ActiveState=active\nActiveEnterTimestamp=@1000\n";
+    let remaining = |text, now_ms| backend::settle_remaining(text, None, now_ms);
+    assert_eq!(remaining(started, 1_000_000), backend::SETTLE);
+    assert_eq!(
+        remaining(started, 1_001_500),
+        backend::SETTLE - Duration::from_millis(1500)
+    );
+    assert_eq!(
+        remaining(started, 1_000_000 + backend::SETTLE.as_millis()),
+        Duration::ZERO
+    );
+    assert_eq!(remaining(started, 9_000_000), Duration::ZERO);
+    // A clock stepped backwards must not turn into an unbounded wait.
+    assert_eq!(remaining(started, 0), backend::SETTLE);
+    // Transactions stop the service before touching the mouse: nothing to wait for.
+    assert_eq!(
+        remaining(
+            "ActiveState=inactive\nActiveEnterTimestamp=@1000\n",
+            1_000_000
+        ),
+        Duration::ZERO
+    );
+    assert_eq!(
+        remaining("ActiveState=active\nActiveEnterTimestamp=\n", 1_000_000),
+        Duration::ZERO
+    );
+    assert_eq!(remaining("", 1_000_000), Duration::ZERO);
+}
+#[test]
+fn queries_wait_out_the_scan_after_a_bluetooth_reconnection() {
+    let settled = "ActiveState=active\nActiveEnterTimestamp=@1000\n";
+    let remaining =
+        |text, connected, now_ms| backend::settle_remaining(text, Some(connected), now_ms);
+    // The service has run for hours; the mouse came back two seconds ago.
+    assert_eq!(
+        remaining(settled, 8_998_000, 9_000_000),
+        backend::SETTLE - Duration::from_secs(2)
+    );
+    assert_eq!(remaining(settled, 8_000_000, 9_000_000), Duration::ZERO);
+    // Whichever scan began last decides.
+    assert_eq!(
+        remaining(settled, 1_003_000, 1_004_000),
+        backend::SETTLE - Duration::from_secs(1)
+    );
+    assert_eq!(
+        remaining(settled, 900_000, 1_004_000),
+        backend::SETTLE - Duration::from_secs(4)
+    );
+    // No service, no scan: a reconnection during a transaction adds no wait.
+    assert_eq!(
+        remaining(
+            "ActiveState=inactive\nActiveEnterTimestamp=@1000\n",
+            8_998_000,
+            9_000_000
+        ),
+        Duration::ZERO
+    );
+    assert_eq!(remaining("", 8_998_000, 9_000_000), Duration::ZERO);
+}
+#[test]
+fn reconnection_time_is_the_newest_logitech_bluetooth_node() {
+    let temp = tempfile::tempdir().unwrap();
+    let (sys, dev) = (temp.path().join("sys"), temp.path().join("dev"));
+    std::fs::create_dir_all(&dev).unwrap();
+    let epoch = std::time::UNIX_EPOCH;
+    let node = |name: &str, hid_id: &str, seconds: Option<u64>| {
+        let device = sys.join(name).join("device");
+        std::fs::create_dir_all(&device).unwrap();
+        std::fs::write(
+            device.join("uevent"),
+            format!("DRIVER=x\nHID_ID={hid_id}\n"),
+        )
+        .unwrap();
+        if let Some(seconds) = seconds {
+            let file = std::fs::File::create(dev.join(name)).unwrap();
+            file.set_modified(epoch + Duration::from_secs(seconds))
+                .unwrap();
+        }
+    };
+    assert_eq!(backend::bluetooth_connected(&sys, &dev), None);
+    node("hidraw2", "0003:0000046D:0000C548", Some(900)); // Bolt receiver, USB
+    node("hidraw4", "0005:000005AC:0000024F", Some(800)); // another vendor's Bluetooth keyboard
+    assert_eq!(backend::bluetooth_connected(&sys, &dev), None);
+    node("hidraw11", "0005:0000046D:0000B034", Some(500));
+    node("hidraw12", "0005:0000046D:0000B023", Some(700));
+    node("hidraw13", "0005:0000046D:0000B034", None); // listed, but its node is already gone
+    assert_eq!(
+        backend::bluetooth_connected(&sys, &dev),
+        Some(epoch + Duration::from_secs(700))
     );
 }
 #[test]
