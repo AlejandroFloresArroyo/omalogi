@@ -94,7 +94,7 @@ fn transport_comes_from_the_selection_adapter_and_is_optional_in_saved_state() {
 #[test]
 fn queries_wait_out_the_solaar_service_startup_scan() {
     let started = "ActiveState=active\nActiveEnterTimestamp=@1000\n";
-    let remaining = |text, now_ms| backend::settle_remaining(text, now_ms);
+    let remaining = |text, now_ms| backend::settle_remaining(text, None, now_ms);
     assert_eq!(remaining(started, 1_000_000), backend::SETTLE);
     assert_eq!(
         remaining(started, 1_001_500),
@@ -120,6 +120,69 @@ fn queries_wait_out_the_solaar_service_startup_scan() {
         Duration::ZERO
     );
     assert_eq!(remaining("", 1_000_000), Duration::ZERO);
+}
+#[test]
+fn queries_wait_out_the_scan_after_a_bluetooth_reconnection() {
+    let settled = "ActiveState=active\nActiveEnterTimestamp=@1000\n";
+    let remaining =
+        |text, connected, now_ms| backend::settle_remaining(text, Some(connected), now_ms);
+    // The service has run for hours; the mouse came back two seconds ago.
+    assert_eq!(
+        remaining(settled, 8_998_000, 9_000_000),
+        backend::SETTLE - Duration::from_secs(2)
+    );
+    assert_eq!(remaining(settled, 8_000_000, 9_000_000), Duration::ZERO);
+    // Whichever scan began last decides.
+    assert_eq!(
+        remaining(settled, 1_003_000, 1_004_000),
+        backend::SETTLE - Duration::from_secs(1)
+    );
+    assert_eq!(
+        remaining(settled, 900_000, 1_004_000),
+        backend::SETTLE - Duration::from_secs(4)
+    );
+    // No service, no scan: a reconnection during a transaction adds no wait.
+    assert_eq!(
+        remaining(
+            "ActiveState=inactive\nActiveEnterTimestamp=@1000\n",
+            8_998_000,
+            9_000_000
+        ),
+        Duration::ZERO
+    );
+    assert_eq!(remaining("", 8_998_000, 9_000_000), Duration::ZERO);
+}
+#[test]
+fn reconnection_time_is_the_newest_logitech_bluetooth_node() {
+    let temp = tempfile::tempdir().unwrap();
+    let (sys, dev) = (temp.path().join("sys"), temp.path().join("dev"));
+    std::fs::create_dir_all(&dev).unwrap();
+    let epoch = std::time::UNIX_EPOCH;
+    let node = |name: &str, hid_id: &str, seconds: Option<u64>| {
+        let device = sys.join(name).join("device");
+        std::fs::create_dir_all(&device).unwrap();
+        std::fs::write(
+            device.join("uevent"),
+            format!("DRIVER=x\nHID_ID={hid_id}\n"),
+        )
+        .unwrap();
+        if let Some(seconds) = seconds {
+            let file = std::fs::File::create(dev.join(name)).unwrap();
+            file.set_modified(epoch + Duration::from_secs(seconds))
+                .unwrap();
+        }
+    };
+    assert_eq!(backend::bluetooth_connected(&sys, &dev), None);
+    node("hidraw2", "0003:0000046D:0000C548", Some(900)); // Bolt receiver, USB
+    node("hidraw4", "0005:000005AC:0000024F", Some(800)); // another vendor's Bluetooth keyboard
+    assert_eq!(backend::bluetooth_connected(&sys, &dev), None);
+    node("hidraw11", "0005:0000046D:0000B034", Some(500));
+    node("hidraw12", "0005:0000046D:0000B023", Some(700));
+    node("hidraw13", "0005:0000046D:0000B034", None); // listed, but its node is already gone
+    assert_eq!(
+        backend::bluetooth_connected(&sys, &dev),
+        Some(epoch + Duration::from_secs(700))
+    );
 }
 #[test]
 fn parses_actual_cli_shapes_and_keeps_choices_per_setting() {

@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
+    fs,
     io::{Read, Write},
+    path::Path,
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -9,9 +11,9 @@ use std::{
 
 pub const SERVICE: &str = "omalogi-solaar.service";
 const CLI: &str = include_str!("../scripts/solaar-cli.py");
-// On start, Solaar scans each device's features and replays its settings: about three
-// seconds of HID++ replies on the node a query would share. Systemd reports the start in
-// whole seconds, so up to one second of this is rounding.
+// When it starts, or when a mouse connects, Solaar scans the device's features and replays
+// its settings: about three seconds of HID++ replies on the node a query would share.
+// Systemd reports the start in whole seconds, so up to one second of this is rounding.
 pub const SETTLE: Duration = Duration::from_secs(6);
 
 pub fn run(program: &str, args: &[&str], input: Option<&str>) -> Result<String, String> {
@@ -92,20 +94,41 @@ pub struct Device {
     pub buttons: BTreeMap<String, String>,
 }
 
-pub fn settle_remaining(show: &str, now_ms: u128) -> Duration {
+/// When the newest Logitech Bluetooth device node appeared. Such a mouse gets a new node
+/// each time it connects, and a running Solaar scans it again then.
+pub fn bluetooth_connected(sys: &Path, dev: &Path) -> Option<SystemTime> {
+    let nodes = fs::read_dir(sys).ok()?.flatten();
+    nodes
+        .filter_map(|node| {
+            let uevent = fs::read_to_string(node.path().join("device/uevent")).ok()?;
+            if !uevent.contains("HID_ID=0005:0000046D:") {
+                return None;
+            }
+            fs::metadata(dev.join(node.file_name()))
+                .ok()?
+                .modified()
+                .ok()
+        })
+        .max()
+}
+
+pub fn settle_remaining(show: &str, connected_ms: Option<u128>, now_ms: u128) -> Duration {
     let field = |name| show.lines().find_map(|line| line.strip_prefix(name));
+    if field("ActiveState=") != Some("active") {
+        return Duration::ZERO;
+    }
     let started = field("ActiveEnterTimestamp=@").and_then(|s| s.parse::<u128>().ok());
-    match (field("ActiveState="), started) {
-        (Some("active"), Some(started)) => {
-            let age = now_ms.saturating_sub(started * 1000);
+    match started.map(|s| s * 1000).max(connected_ms) {
+        Some(scan) => {
+            let age = now_ms.saturating_sub(scan);
             SETTLE.saturating_sub(Duration::from_millis(age.min(u64::MAX as u128) as u64))
         }
-        _ => Duration::ZERO,
+        None => Duration::ZERO,
     }
 }
 
 // Two processes on one HID++ node read each other's replies. Transactions stop the
-// service first; every other query stays out of its startup scan.
+// service first; every other query stays out of its scans.
 fn settle() {
     let show = run(
         "systemctl",
@@ -122,10 +145,17 @@ fn settle() {
         None,
     )
     .unwrap_or_default();
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    thread::sleep(settle_remaining(&show, now.as_millis()));
+    let ms = |time: SystemTime| {
+        time.duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    };
+    let connected = bluetooth_connected(Path::new("/sys/class/hidraw"), Path::new("/dev"));
+    thread::sleep(settle_remaining(
+        &show,
+        connected.map(ms),
+        ms(SystemTime::now()),
+    ));
 }
 
 /// `solaar config` through the selection adapter, which also finds a mouse by unit ID.
