@@ -85,7 +85,7 @@ La publicación en GitHub no constituye una admisión al catálogo de Omarchy Pl
 
 ## Soporte Bluetooth — 2026-10-01
 
-Estado: implementado y cubierto por pruebas simuladas; **sin prueba física por Bluetooth**. El mouse del equipo de desarrollo está emparejado solo con el receptor Bolt (`bluetoothctl devices` no lo lista y sus tres canales Easy-Switch están ocupados), así que emparejarlo por Bluetooth requiere una acción del usuario.
+Estado: implementado y cubierto por pruebas simuladas. Una primera prueba física (abajo) confirmó detección, gestos, DPI y restauración por Bluetooth y terminó con un **incidente sin causa demostrada**; Bluetooth queda como experimental. Esta sección describe lo comprobado antes de emparejar el mouse por Bluetooth.
 
 Hechos comprobados leyendo Solaar 1.1.20 instalado (`/usr/lib/python3.14/site-packages`):
 
@@ -101,11 +101,38 @@ Comprobaciones completadas:
 - Bolt real, solo lectura: la salida de `solaar config <serie>` y la del adaptador fueron idénticas salvo la línea final `# transport: Bolt` (53 y 54 líneas). `omalogi status` con el binario nuevo devolvió `ok: true`, `transport: Bolt`, 11 ajustes, 5 botones, `applied: true`, `pending: false`, `daemon: true`.
 - `scripts/test-panel.py` aprobó con el QML real, incluido el encabezado `Bluetooth · TEST1234 · Connected` con CLI simulado.
 
-Pendiente de evidencia física:
+### Prueba física por Bluetooth — 2026-10-01, 22:15–22:23
 
-- Emparejar el MX Master 3S por Bluetooth y confirmar que `omalogi status` devuelve `transport: Bluetooth` con el Unit ID como identificador.
-- Repetir `scripts/validate-hardware.py prepare`, los once eventos físicos, `verify` y `restore` por Bluetooth.
-- Suspensión y reconexión por Bluetooth: el nodo `hidraw` desaparece mientras el mouse duerme; falta confirmar que Solaar reaplica desvíos y ajustes al volver.
-- Escrituras por Bolt a través del adaptador: solo se comprobó la lectura. La selección del dispositivo es el único cambio en esa ruta.
-- Continuidad del perfil al pasar de Bolt a Bluetooth. Depende de que la serie informada por Bolt coincida con el Unit ID; coincide en el 3S observado y no se ha probado en otros modelos.
+El usuario emparejó el MX Master 3S por Bluetooth; el emparejamiento Bolt quedó en el receptor. Build instalado desde esta rama (`8550aaa`) con `scripts/install.sh --from-source`. El perfil activo se había aplicado días antes por Bolt.
+
+Observado:
+
+- Kernel, 22:15:45: `BLUETOOTH HID v0.06 Mouse [Logitech MX Master 3S]`, `hidraw11`, `HID++ 4.5 device connected`. La regla udev concedió acceso al usuario (ACL presente en el nodo).
+- `solaar show` imprimió el mouse como encabezado sin ranura, con `Serial number:` vacío y `Unit ID:` a nivel de dispositivo, y el emparejamiento Bolt como `Device is offline.`: la misma forma que los fixtures.
+- `solaar config <Unit ID>` de fábrica falló con `no online device found matching`; el binario anterior instalado falló igual. El adaptador devolvió los ajustes y `# transport: Bluetooth`; `omalogi status` con el binario nuevo devolvió `ok: true`, `transport: Bluetooth`, 11 ajustes.
+- El identificador del perfil aplicado por Bolt coincidió con el Unit ID por Bluetooth. Solaar usó la misma entrada de persistencia (el archivo tenía dos entradas: este mouse y otro dispositivo).
+- Gestos por Bluetooth con origen `solaar` y `ok: true`: los cinco a las 22:16:20–22 con las reglas ya existentes, y seis más a las 22:18:52–57, después de dos reinicios del servicio.
+- DPI incremental 1300 → 1350 → 1300 por Bluetooth: 0,97 s y 0,89 s, cada uno con lectura posterior correcta y `applied: true`, `pending: false`, `daemon: true`.
+- `omalogi restore` por Bluetooth, sobre un snapshot tomado por Bolt: 11,4 s, «restored y verificado» según la verificación de la propia CLI.
+
+Incidente:
+
+- La restauración arrancó el servicio a las 22:19:13,5 y se lanzó `omalogi status` de inmediato, que es también lo que hace el panel tras restaurar. El servicio registró lecturas inválidas desde las 22:19:14,66 (`AttributeError` al leer batería) y 14 errores en 17 s; los tres arranques anteriores de la sesión no registraron ninguno.
+- 22:19:15,99: `bluetoothd` registró `Write output report failed`. El nodo `hidraw11` desapareció y el mouse respondió después por Bolt. `status` devolvió «The mouse is not responding» durante el cambio.
+- Por Bolt, la lectura siguiente mostró `scroll-ratchet: Freespinning` aunque la restauración acababa de verificar `Ratcheted`.
+- Solaar dejó en su persistencia ajustes ajenos a un mouse (`headset-*`, `analog-button-tuning_*`, `crown-smooth`, `logivoice-nr-state`), `_NAME: BL` y una segunda entrada para el mismo Unit ID con `dpi` y `divert-keys` marcados como ausentes. El respaldo previo a la prueba ya contenía una clave de ese tipo (`logivoice-ng-state`), de fecha desconocida.
+
+Causa: **no demostrada**. Hipótesis: el servicio recién arrancado y la CLI consultaron HID++ a la vez sobre el mismo nodo `hidraw` Bluetooth y cada proceso interpretó respuestas del otro; una escritura mal dirigida explicaría el cambio de canal y de modo de giro. No se descarta que el canal se cambiara a mano con Easy-Switch. No se intentó reproducir.
+
+Recuperación:
+
+- Perfil reaplicado por Bolt a través del adaptador: transacción completa, 26,9 s, verificada (1300 DPI, Ratcheted, SmartShift 10, botón de gestos desviado). Esto cubre también la escritura por Bolt con el adaptador, que antes solo tenía lectura. `rules.yaml` quedó idéntico byte a byte al previo a la prueba.
+- Esa reaplicación tomó como baseline el estado con Freespinning. Con el servicio detenido se repusieron `~/.config/solaar/config.yaml` y `~/.config/omalogi/state.json` desde el respaldo tomado antes de la prueba, cuyo perfil y valores coinciden con los aplicados. Estado final: `transport: Bolt`, `applied: true`, `pending: false`, `daemon: true`, baseline original, sin errores nuevos en el registro del servicio.
+- Tiempo de una lectura por Bolt, tres pares: Solaar de fábrica 2,57/2,20/2,21 s; adaptador 2,19/2,22/2,21 s.
+
+Pendiente:
+
+- Establecer la causa del incidente antes de recomendar Bluetooth. Si es la concurrencia, afecta también a la apertura del panel justo después de aplicar o restaurar.
+- Transacción completa de `apply` por Bluetooth, eventos de ruedas y botones laterales por Bluetooth, y reconexión tras suspensión.
+- Continuidad del perfil entre Bolt y Bluetooth en otros modelos. Depende de que la serie informada por Bolt coincida con el Unit ID; coincide en el 3S observado.
 

@@ -6,7 +6,7 @@
 - The panel header and `omalogi status` report the live transport (`Bolt`, `Bluetooth`, `USB`) instead of a fixed label.
 - A mouse that is off, asleep or out of range is reported with a short message instead of Solaar's traceback.
 
-Bluetooth is covered by simulated tests and by tests against Solaar 1.1.20's own device matching. It has not been exercised on a physical Bluetooth connection; see VALIDATION.md.
+Bluetooth is experimental. A first hardware test confirmed detection, gestures, DPI changes and restore, and ended with the mouse leaving its Bluetooth channel for a cause not yet established; see VALIDATION.md.
 
 ## 0.1.0-beta.2
 
