@@ -85,7 +85,7 @@ La publicación en GitHub no constituye una admisión al catálogo de Omarchy Pl
 
 ## Soporte Bluetooth — 2026-10-01
 
-Estado: implementado y cubierto por pruebas simuladas. Una primera prueba física (abajo) confirmó detección, gestos, DPI y restauración por Bluetooth y terminó con un **incidente sin causa demostrada**; Bluetooth queda como experimental. Esta sección describe lo comprobado antes de emparejar el mouse por Bluetooth.
+Estado: implementado y cubierto por pruebas simuladas. Una primera prueba física confirmó detección, gestos, DPI y restauración por Bluetooth y terminó con un **incidente sin causa demostrada**. Tras añadir una espera al arranque del servicio, una segunda prueba repitió esa secuencia cinco veces sin incidente y cubrió aplicación completa, ruedas y reconexión. Bluetooth queda como experimental mientras la causa siga siendo una hipótesis. Esta sección describe lo comprobado antes de emparejar el mouse por Bluetooth.
 
 Hechos comprobados leyendo Solaar 1.1.20 instalado (`/usr/lib/python3.14/site-packages`):
 
@@ -130,9 +130,29 @@ Recuperación:
 - Esa reaplicación tomó como baseline el estado con Freespinning. Con el servicio detenido se repusieron `~/.config/solaar/config.yaml` y `~/.config/omalogi/state.json` desde el respaldo tomado antes de la prueba, cuyo perfil y valores coinciden con los aplicados. Estado final: `transport: Bolt`, `applied: true`, `pending: false`, `daemon: true`, baseline original, sin errores nuevos en el registro del servicio.
 - Tiempo de una lectura por Bolt, tres pares: Solaar de fábrica 2,57/2,20/2,21 s; adaptador 2,19/2,22/2,21 s.
 
+### Espera al arranque del servicio y segunda prueba — 2026-10-01, 23:18–23:33
+
+Medición pasiva (lectura de los nodos `hidraw` de Logitech, sin enviar nada), tres reinicios del servicio sin ninguna consulta de la CLI, con el mouse por Bluetooth desde las 23:18:02:
+
+- Nodo Bluetooth del mouse: 121 respuestas HID++ en cada reinicio, la primera a 0,36–0,47 s del arranque y la última a 2,55–2,88 s, sin pausas mayores de 0,5 s.
+- Otro mouse Logitech por receptor Lightspeed: 202–208 respuestas, hasta 2,96–3,10 s. Nodo del receptor Bolt: 9.
+- El incidente ocurrió 2,46 s después de un arranque, dentro de esa ventana y con una consulta de la CLI solapada. Es coherente con la hipótesis de lecturas cruzadas; no la demuestra.
+
+Cambio: antes de cualquier consulta HID++, la CLI pregunta a systemd cuánto lleva activo el servicio y espera hasta completar 6 s. Las transacciones detienen el servicio y no esperan. Pruebas: 11 contratos Rust y 60 pruebas Python; tres de ellas comprueban que ninguna consulta llega al mouse durante los primeros 3 s, con y sin perfil guardado, y que un servicio asentado no añade demora. Mutation check: quitar la espera en `config`, quitarla en el descubrimiento, ignorar la antigüedad del servicio o esperar con el servicio detenido hace fallar una prueba en cada caso.
+
+Con el build `2b653a4` instalado y el mouse por Bluetooth:
+
+- La secuencia del incidente, cinco veces seguidas: `restore`, `status` inmediato, `apply` del perfil, `status` inmediato. Las diez consultas inmediatas tardaron 7,4–8,7 s (espera incluida) y devolvieron `transport: Bluetooth` con los valores esperados (1000 DPI y botón de gestos normal tras restaurar; 1300 DPI y desviado tras aplicar). Cero errores en el registro del servicio, una sola entrada de Solaar para el mouse, sin claves nuevas ni perdidas.
+- Diez transacciones completas por Bluetooth en esos ciclos: `restore` 10,6–11,6 s y `apply` 10,2–11,1 s, todas verificadas por la CLI.
+- Perfil de diagnóstico (once eventos, ambas ruedas y botones laterales desviados) aplicado y verificado en 11,3 s. Eventos físicos del usuario con origen `solaar` y `ok: true`: `gesture.click` (3), `gesture.right` (2), `wheel.up` (10), `wheel.down` (27), `thumb.left` (1), `thumb.right` (1).
+- No se registraron `button.back`, `button.forward`, `gesture.up`, `gesture.down` ni `gesture.left` en esa ventana de 150 s. No se sabe si no se pulsaron o si no se capturaron. Los tres gestos sí se registraron por Bluetooth en la primera prueba; los botones laterales no tienen evidencia por Bluetooth.
+- Reconexión: apagado y encendido físico, nodo Bluetooth ausente 2,5 s. Después de reconectar se registró `wheel.down` con origen `solaar`: Solaar repuso el desvío de la rueda. Se esperaron 10 s tras la reconexión antes de la siguiente consulta de la CLI.
+- Cierre: perfil del usuario reaplicado y verificado por Bluetooth; `applied: true`, `pending: false`, `daemon: true`; cero errores del servicio durante toda la ventana.
+
 Pendiente:
 
-- Establecer la causa del incidente antes de recomendar Bluetooth. Si es la concurrencia, afecta también a la apertura del panel justo después de aplicar o restaurar.
-- Transacción completa de `apply` por Bluetooth, eventos de ruedas y botones laterales por Bluetooth, y reconexión tras suspensión.
+- La causa del incidente sigue sin demostrar. No se reprodujo a propósito sin la espera; el resultado es 1 incidente en 3 consultas inmediatas sin espera frente a 0 en 10 con ella.
+- La espera cubre el arranque del servicio, no el escaneo que Solaar repite cuando el mouse reconecta con el servicio ya activo. Una consulta de la CLI en esos segundos no está protegida.
+- Botones laterales por Bluetooth, y reconexión tras una suspensión larga del mouse o del equipo.
 - Continuidad del perfil entre Bolt y Bluetooth en otros modelos. Depende de que la serie informada por Bolt coincida con el Unit ID; coincide en el 3S observado.
 

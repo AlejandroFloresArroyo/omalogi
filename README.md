@@ -8,7 +8,7 @@ Omalogi adds a mouse widget to the Omarchy bar. Its popup saves and applies chan
 
 Preview rendered with simulated device data in the native Omarchy components.
 
-**Beta compatibility:** MX Master 3S connected through a Logitech Bolt receiver, Omarchy 4.0.4, Quickshell 0.3.1, Hyprland 0.56.2 and Solaar 1.1.20. Direct Bluetooth is experimental: detection, gestures, DPI and restore worked in a first hardware test, which ended with the mouse leaving its Bluetooth channel for a cause not yet established. Other models and other software versions are not yet validated. A real new-session startup and installation on a second clean machine remain pending; see [VALIDATION.md](VALIDATION.md).
+**Beta compatibility:** MX Master 3S connected through a Logitech Bolt receiver, Omarchy 4.0.4, Quickshell 0.3.1, Hyprland 0.56.2 and Solaar 1.1.20. Direct Bluetooth is experimental: it was exercised on the same mouse, but one early test ended with the mouse leaving its Bluetooth channel and the cause is not established; see [VALIDATION.md](VALIDATION.md). Other models and other software versions are not yet validated. A real new-session startup and installation on a second clean machine remain pending; see [VALIDATION.md](VALIDATION.md).
 
 ## Features
 
